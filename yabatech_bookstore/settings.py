@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from datetime import timedelta
 from dotenv import load_dotenv
-
+from celery.schedules import crontab
 
 load_dotenv()
 
@@ -37,8 +37,8 @@ INSTALLED_APPS = [
     'users',
     'books',
     'orders',
-    # 'payments',
-    # 'notifications',
+    'payments',
+    'notifications',
 ]
 
 MIDDLEWARE = [
@@ -178,3 +178,21 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'UTC'
+
+CELERY_BEAT_SCHEDULE = {
+    'check-pending-payments':{
+        'task': 'payments.tasks.check_pending_payments',
+        'schedule': crontab(minute='*/15'),  # every 30 minutes
+    }
+}
+
+
+# Payment Gateway Configurations
+PAYSTACK_PUBLIC_KEY = os.getenv('PAYSTACK_PUBLIC_KEY', '')
+PAYSTACK_SECRET_KEY = os.getenv('PAYSTACK_SECRET_KEY', '')
+FLUTTERWAVE_PUBLIC_KEY = os.getenv('FLUTTERWAVE_PUBLIC_KEY', '')
+FLUTTERWAVE_SECRET_KEY = os.getenv('FLUTTERWAVE_SECRET_KEY', '')
+FLUTTERWAVE_WEBHOOK_SECRET = os.getenv('FLUTTERWAVE_WEBHOOK_SECRET', '')
+
+# Frontend URL for callbacks
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
