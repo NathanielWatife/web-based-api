@@ -35,7 +35,7 @@ INSTALLED_APPS = [
 
     # Local apps
     'users',
-    # 'books',
+    'books',
     # 'orders',
     # 'payments',
     # 'notifications',
