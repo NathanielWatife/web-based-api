@@ -1,10 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate
 from .models import User
-import random
-import string
-from datetime import timedelta
-from django.utils import timezone
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
@@ -12,26 +8,18 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = User
-        fields = ('email', 'password', 'confirm_password', 'matric_no', 
+        fields = ('id', 'email', 'password', 'confirm_password', 'matric_no', 
                  'first_name', 'last_name', 'department', 'level', 'phone')
     
     def validate(self, attrs):
         if attrs['password'] != attrs['confirm_password']:
-            raise serializers.ValidationError("Passwords do not match")
+            raise serializers.ValidationError({"pasword":"Passwords do not match"})
         return attrs
     
     def create(self, validated_data):
         validated_data.pop('confirm_password')
-        
-        # Generate verification code
-        verification_code = ''.join(random.choices(string.digits, k=6))
-        
-        user = User.objects.create_user(
-            **validated_data,
-            verification_code=verification_code,
-            verification_code_expires=timezone.now() + timedelta(hours=24)
-        )
-        
+        user = User.objects.create_user(**validated_data)
+        user.generate_verification_code()
         return user
 
 class UserLoginSerializer(serializers.Serializer):
@@ -59,7 +47,6 @@ class UserProfileSerializer(serializers.ModelSerializer):
         model = User
         fields = ('id', 'email', 'matric_no', 'first_name', 'last_name', 
                  'department', 'level', 'phone', 'role', 'is_verified')
-        read_only_fields = ('id', 'email', 'role', 'is_verified')
 
 class EmailVerificationSerializer(serializers.Serializer):
     email = serializers.EmailField()

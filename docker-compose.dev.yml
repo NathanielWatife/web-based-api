@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=True
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    command: python manage.py runserver 0.0.0.0:8000
+    depends_on:
+      - db
+      - redis
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+    depends_on:
+      - backend
+
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: yabatech_bookstore
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  celery:
+    build: ./backend
+    command: celery -A yabatech_bookstore worker --loglevel=info
+    environment:
+      - DEBUG=True
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - redis
+      - db
+
+volumes:
+  postgres_data:
+  static_volume:
+  media_volume:

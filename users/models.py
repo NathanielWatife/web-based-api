@@ -1,6 +1,8 @@
-from django.db import models
 from django.contrib.auth.models import AbstractUser
+from django.db import models
 import uuid
+from datetime import timedelta
+from django.utils import timezone
 
 # Create your models here.
 class User(AbstractUser):
@@ -31,8 +33,14 @@ class User(AbstractUser):
     def __str__(self):
         return f"{self.matric_no} - {self.email}"
     
-
-    class meta:
-        db_table = 'users'
-
-        
+    def generate_verification_code(self):
+        import random
+        self.verification_code = str(random.randint(100000, 999999))
+        self.verification_code_expires = timezone.now() + timedelta(minutes=24)
+        self.save()
+        return self.verification_code
+    
+    def is_verification_code_expired(self):
+        if self.verification_code_expires:
+            return timezone.now() > self.verification_code_expires
+        return True
