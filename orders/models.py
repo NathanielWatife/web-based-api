@@ -1,6 +1,21 @@
 from django.db import models
 import uuid
 from django.conf import settings
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
+
+
+@receiver(post_save, sender='payments.PaymentTransaction')
+def payment_status_change_handler(sender, instance, **kwargs):
+    """Handle payment status changes and send notifications"""
+    if not kwargs.get('created'):
+        if instance.tracker.has_changed('status') and instance.status == 'success':
+            from notifications.tasks import send_order_notification
+            send_order_notification.delay(
+                str(instance.order.id), 
+                'payment_success'
+            )
 
 class Order(models.Model):
     STATUS_CHOICES = [

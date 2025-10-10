@@ -183,7 +183,11 @@ CELERY_BEAT_SCHEDULE = {
     'check-pending-payments':{
         'task': 'payments.tasks.check_pending_payments',
         'schedule': crontab(minute='*/15'),  # every 30 minutes
-    }
+    },
+    'cleanup-old-notifications': {
+        'task': 'notifications.tasks.cleanup_old_notifications',
+        'schedule': crontab(hour=2, minute=0),  # Daily at 2 AM
+    },
 }
 
 
