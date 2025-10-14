@@ -1,7 +1,7 @@
 const Order = require('../models/Order');
 const Book = require('../models/Book');
 const User = require('../models/User');
-const { sendEmail } = require('../config/emailConfig');
+const { sendEmail } = require('../config/email');
 const { orderConfirmationTemplate } = require('../utils/emailTemplates');
 const { formatResponse, paginate } = require('../utils/helpers');
 

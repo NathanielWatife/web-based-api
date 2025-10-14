@@ -7,7 +7,7 @@ const User = require('../models/User');
 const Book = require('../models/Book');
 const Category = require('../models/Category');
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/yabatech-bookstore';
+const MONGODB_URI = process.env.MONGO_URI;
 
 const categories = [
   {

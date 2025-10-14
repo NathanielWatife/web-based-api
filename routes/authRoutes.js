@@ -10,8 +10,8 @@ const {
   updateProfile,
   resendVerification
 } = require('../controllers/authController');
-const { protect } = require('../middleware/authMiddleware');
-const { handleValidationErrors } = require('../middleware/validationMiddleware');
+const { protect } = require('../middlewares/authMiddleware');
+const { handleValidationErrors } = require('../middlewares/validationMiddleware');
 
 const router = express.Router();
 

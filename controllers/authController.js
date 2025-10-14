@@ -1,6 +1,6 @@
 const User = require('../models/User');
 const { generateToken } = require('../utils/generateToken');
-const { sendEmail } = require('../config/emailConfig');
+const { sendEmail } = require('../config/email');
 const { verificationEmailTemplate, passwordResetTemplate } = require('../utils/emailTemplates');
 const { generateRandomToken, generateResetToken, formatResponse } = require('../utils/helpers');
 const crypto = require('crypto');

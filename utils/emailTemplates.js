@@ -72,7 +72,7 @@ const orderConfirmationTemplate = (order, user) => {
           <h3>Order Items:</h3>
           ${order.items.map(item => `
             <div class="order-item">
-              <p><strong>${item.book.title}</strong></p>
+              <p><strong>${item.book?.title || 'Book'}</strong></p>
               <p>Quantity: ${item.quantity} | Price: ₦${item.price}</p>
             </div>
           `).join('')}

@@ -8,8 +8,8 @@ const {
   getAllOrders,
   cancelOrder
 } = require('../controllers/orderController');
-const { protect, authorize } = require('../middleware/authMiddleware');
-const { handleValidationErrors } = require('../middleware/validationMiddleware');
+const { protect, authorize } = require('../middlewares/authMiddleware');
+const { handleValidationErrors } = require('../middlewares/validationMiddleware');
 
 const router = express.Router();
 

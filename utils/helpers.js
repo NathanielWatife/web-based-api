@@ -27,9 +27,15 @@ const paginate = (page = 1, limit = 10) => {
   return { skip, limit };
 };
 
+// Generate email verification token
+const generateEmailVerificationToken = () => {
+  return crypto.randomBytes(32).toString('hex');
+};
+
 module.exports = {
   generateRandomToken,
   generateResetToken,
   formatResponse,
-  paginate
+  paginate,
+  generateEmailVerificationToken
 };

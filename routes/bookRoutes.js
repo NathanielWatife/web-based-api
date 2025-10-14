@@ -10,9 +10,9 @@ const {
   updateStock,
   getFeaturedBooks
 } = require('../controllers/bookController');
-const { protect, authorize } = require('../middleware/authMiddleware');
-const { uploadSingleImage } = require('../middleware/uploadMiddleware');
-const { handleValidationErrors } = require('../middleware/validationMiddleware');
+const { protect, authorize } = require('../middlewares/authMiddleware');
+const { uploadSingleImage } = require('../middlewares/uploadMiddleware');
+const { handleValidationErrors } = require('../middlewares/validationMiddleware');
 
 const router = express.Router();
 
