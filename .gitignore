@@ -7,7 +7,7 @@ pnpm-debug.log*
 
 # Environment files (contain secrets)
 /.env
-.env.*
+.env
 !.env.example
 
 # Build output
