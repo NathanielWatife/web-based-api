@@ -7,7 +7,7 @@ const User = require('../models/User');
 const Book = require('../models/Book');
 const Category = require('../models/Category');
 
-const MONGODB_URI = process.env.MONGO_URI;
+const MONGO_URI = process.env.MONGO_URI;
 
 const categories = [
   {
@@ -108,7 +108,7 @@ const books = [
 const seedDatabase = async () => {
   try {
     // Connect to MongoDB
-    await mongoose.connect(MONGODB_URI);
+    await mongoose.connect(MONGO_URI);
     console.log('Connected to MongoDB');
 
     // Clear existing data
