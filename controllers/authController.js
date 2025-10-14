@@ -130,7 +130,7 @@ const login = async (req, res, next) => {
       );
     }
 
-    // Generate token
+    // Generate token using the improved function
     const token = generateToken(user._id);
 
     res.json(

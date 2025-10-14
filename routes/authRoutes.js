@@ -18,8 +18,8 @@ const router = express.Router();
 // Validation rules
 const registerValidation = [
   body('matricNo')
-    .matches(/^[A-Z]{3}\/\d{2}\/\d{4}$/)
-    .withMessage('Please enter a valid matric number format (e.g., CST/20/1234)'),
+    .matches(/^[fpFP]\/(hd|HD|nd|ND)\/\d{2}\/\d{7}$/i)
+    .withMessage('Please enter a valid matric number format (e.g., F/HD/23/3210015 or P/ND/23/3210015)'),
   body('email')
     .isEmail()
     .normalizeEmail()

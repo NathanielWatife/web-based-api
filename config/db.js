@@ -1,15 +1,9 @@
 const mongoose = require('mongoose');
 
 const connectDB = async () => {
-    try {
-        // Debug: Check what environment variables are available
-        console.log('Environment variables check:');
-        console.log('MONGO_URI:', process.env.MONGO_URI ? 'Found' : 'Not found');
-        console.log('MONGODB_URI:', process.env.MONGODB_URI ? 'Found' : 'Not found');
-        console.log('PORT:', process.env.PORT);
-        
+    try {        
         // Use MONGODB_URI (from your .env file) or fallback
-        const mongoURI = process.env.MONGODB_URI || process.env.MONGO_URI;
+        const mongoURI = process.env.MONGO_URI;
         
         if (!mongoURI) {
             throw new Error('MongoDB URI not found in environment variables. Please check your .env file');
