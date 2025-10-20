@@ -88,7 +88,7 @@ const initializePayment = async (req, res) => {
         amount: order.totalAmount,
         currency: 'NGN',
         payment_options: 'card, banktransfer, ussd',
-        redirect_url: `${process.env.CLIENT_URL}/orders/${order._id}`,
+        redirect_url: `${process.env.FRONTEND_URL}/orders/${order._id}`,
         customer: {
           email: order.user.email,
           name: `${order.user.firstName} ${order.user.lastName}`
@@ -96,7 +96,7 @@ const initializePayment = async (req, res) => {
         customizations: {
           title: 'YabaTech BookStore',
           description: `Payment for Order ${order.orderId}`,
-          logo: `${process.env.CLIENT_URL}/logo.png`
+          logo: `${process.env.FRONTEND_URL}/logo.png`
         },
         meta: {
           orderId: order._id.toString(),
@@ -134,7 +134,7 @@ const initializePayment = async (req, res) => {
         res.json({
           success: true,
           data: {
-            authorizationUrl: `${process.env.CLIENT_URL}/orders/${order._id}`,
+            authorizationUrl: `${process.env.FRONTEND_URL}/orders/${order._id}`,
             reference: reference,
             mock: true
           }

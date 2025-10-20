@@ -21,7 +21,7 @@ const connectDB = async () => {
     console.error('Database connection error:', error.message);
     
     if (error.name === 'MongoParseError') {
-      console.error('Please check your MONGODB_URI format');
+      console.error('Please check your MONGO_URI format');
     } else if (error.name === 'MongoNetworkError') {
       console.error('Please make sure MongoDB is running');
     }
