@@ -1,79 +1,25 @@
 const express = require('express');
-const { body } = require('express-validator');
 const {
-  register,
+  registerStudent,
   verifyEmail,
   login,
-  getMe,
+  adminLogin,
+  resendVerification,
   forgotPassword,
   resetPassword,
-  updateProfile,
-  resendVerification
+  verifyToken
 } = require('../controllers/authController');
-const { protect } = require('../middlewares/authMiddleware');
-const { handleValidationErrors } = require('../middlewares/validationMiddleware');
+const { protect } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
-// Validation rules
-const registerValidation = [
-  body('matricNo')
-    .matches(/^[fpFP]\/(hd|HD|nd|ND)\/\d{2}\/\d{7}$/i)
-    .withMessage('Please enter a valid matric number format (e.g., F/HD/23/3210015 or P/ND/23/3210015)'),
-  body('email')
-    .isEmail()
-    .normalizeEmail()
-    .withMessage('Please enter a valid email'),
-  body('password')
-    .isLength({ min: 6 })
-    .withMessage('Password must be at least 6 characters long'),
-  body('fullName')
-    .notEmpty()
-    .trim()
-    .withMessage('Full name is required')
-];
-
-const loginValidation = [
-  body('email')
-    .isEmail()
-    .normalizeEmail()
-    .withMessage('Please enter a valid email'),
-  body('password')
-    .notEmpty()
-    .withMessage('Password is required')
-];
-
-const emailValidation = [
-  body('email')
-    .isEmail()
-    .normalizeEmail()
-    .withMessage('Please enter a valid email')
-];
-
-const resetPasswordValidation = [
-  body('token')
-    .notEmpty()
-    .withMessage('Reset token is required'),
-  body('password')
-    .isLength({ min: 6 })
-    .withMessage('Password must be at least 6 characters long')
-];
-
-// Routes
-router.post('/register', registerValidation, handleValidationErrors, register);
-router.post('/verify-email', [
-  body('token').notEmpty().withMessage('Verification token is required')
-], handleValidationErrors, verifyEmail);
-router.post('/login', loginValidation, handleValidationErrors, login);
-router.post('/forgot-password', emailValidation, handleValidationErrors, forgotPassword);
-router.post('/reset-password', resetPasswordValidation, handleValidationErrors, resetPassword);
-router.post('/resend-verification', emailValidation, handleValidationErrors, resendVerification);
-
-// Protected routes
-router.get('/me', protect, getMe);
-router.put('/profile', protect, [
-  body('fullName').optional().trim().notEmpty().withMessage('Full name cannot be empty'),
-  body('email').optional().isEmail().withMessage('Please enter a valid email')
-], handleValidationErrors, updateProfile);
+router.post('/register', registerStudent);
+router.post('/verify-email', verifyEmail);
+router.post('/login', login);
+router.post('/admin/login', adminLogin);
+router.post('/resend-verification', resendVerification);
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password', resetPassword);
+router.get('/verify-token', protect, verifyToken);
 
 module.exports = router;

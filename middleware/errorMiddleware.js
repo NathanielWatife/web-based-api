@@ -1,11 +1,9 @@
-const { formatResponse } = require('../utils/helpers');
-
 const errorHandler = (err, req, res, next) => {
   let error = { ...err };
   error.message = err.message;
 
-  // Log error
-  console.error(err);
+  // Log to console for dev
+  console.log(err);
 
   // Mongoose bad ObjectId
   if (err.name === 'CastError') {
@@ -26,9 +24,10 @@ const errorHandler = (err, req, res, next) => {
     error = { message, statusCode: 400 };
   }
 
-  res.status(error.statusCode || 500).json(
-    formatResponse(false, error.message || 'Server Error')
-  );
+  res.status(error.statusCode || 500).json({
+    success: false,
+    message: error.message || 'Server Error'
+  });
 };
 
 module.exports = errorHandler;

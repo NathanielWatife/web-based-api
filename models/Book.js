@@ -17,6 +17,10 @@ const bookSchema = new mongoose.Schema({
     unique: true,
     trim: true
   },
+  description: {
+    type: String,
+    trim: true
+  },
   price: {
     type: Number,
     required: [true, 'Price is required'],
@@ -27,37 +31,54 @@ const bookSchema = new mongoose.Schema({
     required: [true, 'Category is required'],
     trim: true
   },
-  description: {
+  courseCode: {
     type: String,
-    required: [true, 'Description is required']
+    trim: true
+  },
+  faculty: {
+    type: String,
+    trim: true
   },
   stockQuantity: {
     type: Number,
     required: [true, 'Stock quantity is required'],
-    min: [0, 'Stock quantity cannot be negative'],
+    min: [0, 'Stock cannot be negative'],
     default: 0
   },
   imageUrl: {
     type: String,
-    default: ''
+    default: 'default-book-cover.jpg'
   },
-  publisher: {
-    type: String,
-    required: [true, 'Publisher is required']
-  },
-  publicationYear: {
-    type: Number,
-    required: [true, 'Publication year is required']
-  },
-  isAvailable: {
+  isActive: {
     type: Boolean,
     default: true
+  },
+  ratings: {
+    average: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 5
+    },
+    count: {
+      type: Number,
+      default: 0
+    }
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now
   }
-}, {
-  timestamps: true
 });
 
-// Index for search functionality
-bookSchema.index({ title: 'text', author: 'text', description: 'text' });
+// Update updatedAt before saving
+bookSchema.pre('save', function(next) {
+  this.updatedAt = Date.now();
+  next();
+});
 
 module.exports = mongoose.model('Book', bookSchema);

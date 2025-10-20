@@ -1,371 +1,469 @@
 const User = require('../models/User');
-const { generateToken } = require('../utils/generateToken');
-const { sendEmail } = require('../config/email');
-const { verificationEmailTemplate, passwordResetTemplate } = require('../utils/emailTemplates');
-const { generateRandomToken, generateResetToken, formatResponse } = require('../utils/helpers');
-const crypto = require('crypto');
+const Verification = require('../models/Verification');
+const generateToken = require('../utils/generateToken');
+const { sendEmail, emailTemplates } = require('../utils/sendEmail');
+const generateVerificationCode = require('../utils/generateVerificationCode');
 
-// @desc    Register a new user
+// @desc    Register student
 // @route   POST /api/auth/register
 // @access  Public
-const register = async (req, res, next) => {
+const registerStudent = async (req, res) => {
   try {
-    const { matricNo, email, password, fullName } = req.body;
+    const { 
+      firstName, 
+      lastName, 
+      email, 
+      matricNo, 
+      password, 
+      phoneNumber, 
+      faculty, 
+      department, 
+      programme, 
+      admissionYear 
+    } = req.body;
 
-    // Check if user already exists
-    const existingUser = await User.findOne({
-      $or: [{ email }, { matricNo }]
+    // Check if user exists
+    const userExists = await User.findOne({ 
+      $or: [{ email }, { matricNo }] 
     });
 
-    if (existingUser) {
-      return res.status(400).json(
-        formatResponse(false, 'User with this email or matric number already exists')
-      );
+    if (userExists) {
+      return res.status(400).json({
+        success: false,
+        message: 'User already exists with this email or matric number'
+      });
     }
-
-    // Generate email verification token
-    const emailVerificationToken = generateRandomToken();
 
     // Create user
     const user = await User.create({
-      matricNo,
+      firstName,
+      lastName,
       email,
+      matricNo,
       password,
-      fullName,
-      emailVerificationToken
+      phoneNumber,
+      faculty,
+      department,
+      programme,
+      admissionYear
     });
 
-    // Generate JWT token
-    const token = generateToken(user._id);
+    // Generate verification code
+    const verificationCode = generateVerificationCode();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    await Verification.create({
+      matricNo: user.matricNo,
+      code: verificationCode,
+      type: 'email-verification',
+      expiresAt
+    });
 
     // Send verification email
-    const emailResult = await sendEmail({
-      email: user.email,
-      subject: 'Verify Your Email - YabaTech Bookstore',
-      html: verificationEmailTemplate(emailVerificationToken, user.fullName)
-    });
-
-    if (!emailResult.success) {
-      console.error('Failed to send verification email:', emailResult.error);
+    try {
+      await sendEmail({
+        email: user.email,
+        subject: 'Verify Your Email - YabaTech BookStore',
+        html: emailTemplates.verification(user.firstName, verificationCode)
+      });
+    } catch (emailError) {
+      console.error('Email sending failed:', emailError);
+      // Continue even if email fails
     }
 
-    res.status(201).json(
-      formatResponse(true, 'Registration successful. Please check your email for verification.', {
+    res.status(201).json({
+      success: true,
+      message: 'Registration successful. Please check your email for verification code.',
+      data: {
         user: {
-          _id: user._id,
-          matricNo: user.matricNo,
+          id: user._id,
+          firstName: user.firstName,
+          lastName: user.lastName,
           email: user.email,
-          fullName: user.fullName,
-          role: user.role,
-          isEmailVerified: user.isEmailVerified
-        },
-        token,
-        emailSent: emailResult.success
-      })
-    );
+          matricNo: user.matricNo
+        }
+      }
+    });
+
   } catch (error) {
-    next(error);
+    console.error('Registration error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Registration failed'
+    });
   }
 };
 
-// @desc    Verify user email
+// @desc    Verify email
 // @route   POST /api/auth/verify-email
 // @access  Public
-const verifyEmail = async (req, res, next) => {
+const verifyEmail = async (req, res) => {
   try {
-    const { token } = req.body;
+    const { matricNo, verificationCode } = req.body;
 
-    const user = await User.findOne({
-      emailVerificationToken: token
+    // Find verification record
+    const verification = await Verification.findOne({
+      matricNo: matricNo.toUpperCase(),
+      code: verificationCode,
+      type: 'email-verification',
+      used: false,
+      expiresAt: { $gt: new Date() }
     });
 
-    if (!user) {
-      return res.status(400).json(
-        formatResponse(false, 'Invalid or expired verification token')
-      );
+    if (!verification) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired verification code'
+      });
     }
 
-    // Update user
-    user.isEmailVerified = true;
-    user.emailVerificationToken = undefined;
-    await user.save();
-
-    res.json(
-      formatResponse(true, 'Email verified successfully. You can now login.')
+    // Update user verification status
+    const user = await User.findOneAndUpdate(
+      { matricNo: matricNo.toUpperCase() },
+      { isVerified: true },
+      { new: true }
     );
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Mark verification as used
+    verification.used = true;
+    await verification.save();
+
+    // Generate token
+    const token = generateToken(user._id);
+
+    res.json({
+      success: true,
+      message: 'Email verified successfully',
+      data: {
+        token,
+        user: {
+          id: user._id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          matricNo: user.matricNo,
+          role: user.role,
+          isVerified: user.isVerified
+        }
+      }
+    });
+
   } catch (error) {
-    next(error);
+    console.error('Email verification error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Email verification failed'
+    });
   }
 };
 
 // @desc    Login user
 // @route   POST /api/auth/login
 // @access  Public
-const login = async (req, res, next) => {
+const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { matricNo, password } = req.body;
 
-    // Check if user exists
-    const user = await User.findOne({ email }).select('+password');
+    // Check if user exists and password is correct
+    const user = await User.findOne({ matricNo: matricNo.toUpperCase() }).select('+password');
 
-    if (!user) {
-      return res.status(401).json(
-        formatResponse(false, 'Invalid email or password')
-      );
+    if (!user || !(await user.correctPassword(password, user.password))) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid matric number or password'
+      });
     }
 
-    // Check if password matches
-    const isPasswordMatch = await user.matchPassword(password);
-
-    if (!isPasswordMatch) {
-      return res.status(401).json(
-        formatResponse(false, 'Invalid email or password')
-      );
+    if (!user.isVerified) {
+      return res.status(401).json({
+        success: false,
+        message: 'Please verify your email address first'
+      });
     }
 
-    // Check if email is verified
-    if (!user.isEmailVerified) {
-      return res.status(403).json(
-        formatResponse(false, 'Please verify your email address before logging in')
-      );
-    }
-
-    // Generate token using the improved function
+    // Generate token
     const token = generateToken(user._id);
 
-    res.json(
-      formatResponse(true, 'Login successful', {
+    res.json({
+      success: true,
+      message: 'Login successful',
+      data: {
+        token,
         user: {
-          _id: user._id,
-          matricNo: user.matricNo,
+          id: user._id,
+          firstName: user.firstName,
+          lastName: user.lastName,
           email: user.email,
-          fullName: user.fullName,
+          matricNo: user.matricNo,
           role: user.role,
-          isEmailVerified: user.isEmailVerified
-        },
-        token
-      })
-    );
+          faculty: user.faculty,
+          department: user.department
+        }
+      }
+    });
+
   } catch (error) {
-    next(error);
+    console.error('Login error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Login failed'
+    });
   }
 };
 
-// @desc    Get current user
-// @route   GET /api/auth/me
-// @access  Private
-const getMe = async (req, res, next) => {
+// @desc    Admin login
+// @route   POST /api/auth/admin/login
+// @access  Public
+const adminLogin = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
+    const { email, password } = req.body;
 
-    res.json(
-      formatResponse(true, 'User retrieved successfully', {
+    // Check if admin exists and password is correct
+    const user = await User.findOne({ email, role: 'admin' }).select('+password');
+
+    if (!user || !(await user.correctPassword(password, user.password))) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid email or password'
+      });
+    }
+
+    // Generate token
+    const token = generateToken(user._id);
+
+    res.json({
+      success: true,
+      message: 'Admin login successful',
+      data: {
+        token,
         user: {
-          _id: user._id,
-          matricNo: user.matricNo,
+          id: user._id,
+          firstName: user.firstName,
+          lastName: user.lastName,
           email: user.email,
-          fullName: user.fullName,
-          role: user.role,
-          isEmailVerified: user.isEmailVerified,
-          createdAt: user.createdAt
+          role: user.role
         }
-      })
-    );
+      }
+    });
+
   } catch (error) {
-    next(error);
+    console.error('Admin login error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Admin login failed'
+    });
+  }
+};
+
+// @desc    Resend verification code
+// @route   POST /api/auth/resend-verification
+// @access  Public
+const resendVerification = async (req, res) => {
+  try {
+    const { matricNo } = req.body;
+
+    const user = await User.findOne({ matricNo: matricNo.toUpperCase() });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    if (user.isVerified) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email already verified'
+      });
+    }
+
+    // Generate new verification code
+    const verificationCode = generateVerificationCode();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    await Verification.create({
+      matricNo: user.matricNo,
+      code: verificationCode,
+      type: 'email-verification',
+      expiresAt
+    });
+
+    // Send verification email
+    try {
+      await sendEmail({
+        email: user.email,
+        subject: 'Verify Your Email - YabaTech BookStore',
+        html: emailTemplates.verification(user.firstName, verificationCode)
+      });
+    } catch (emailError) {
+      console.error('Email sending failed:', emailError);
+    }
+
+    res.json({
+      success: true,
+      message: 'Verification code sent successfully'
+    });
+
+  } catch (error) {
+    console.error('Resend verification error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to resend verification code'
+    });
   }
 };
 
 // @desc    Forgot password
 // @route   POST /api/auth/forgot-password
 // @access  Public
-const forgotPassword = async (req, res, next) => {
+const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
 
     const user = await User.findOne({ email });
 
     if (!user) {
-      return res.status(404).json(
-        formatResponse(false, 'User with this email does not exist')
-      );
+      return res.status(404).json({
+        success: false,
+        message: 'No user found with this email address'
+      });
     }
 
-    // Generate reset token
-    const { resetToken, resetPasswordExpire } = generateResetToken();
+    // Generate reset code
+    const resetCode = generateVerificationCode();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-    // Save reset token to user
-    user.resetPasswordToken = crypto
-      .createHash('sha256')
-      .update(resetToken)
-      .digest('hex');
-    user.resetPasswordExpire = resetPasswordExpire;
-    await user.save();
-
-    // Send password reset email
-    const emailResult = await sendEmail({
-      email: user.email,
-      subject: 'Password Reset Request - YabaTech Bookstore',
-      html: passwordResetTemplate(resetToken, user.fullName)
+    await Verification.create({
+      matricNo: user.matricNo,
+      code: resetCode,
+      type: 'password-reset',
+      expiresAt
     });
 
-    if (!emailResult.success) {
-      console.error('Failed to send password reset email:', emailResult.error);
+    // Send reset email
+    try {
+      await sendEmail({
+        email: user.email,
+        subject: 'Password Reset - YabaTech BookStore',
+        html: emailTemplates.passwordReset(user.firstName, resetCode)
+      });
+    } catch (emailError) {
+      console.error('Email sending failed:', emailError);
     }
 
-    res.json(
-      formatResponse(true, 'Password reset email sent successfully', {
-        emailSent: emailResult.success
-      })
-    );
+    res.json({
+      success: true,
+      message: 'Password reset instructions sent to your email'
+    });
+
   } catch (error) {
-    next(error);
+    console.error('Forgot password error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to process password reset request'
+    });
   }
 };
 
 // @desc    Reset password
 // @route   POST /api/auth/reset-password
 // @access  Public
-const resetPassword = async (req, res, next) => {
+const resetPassword = async (req, res) => {
   try {
-    const { token, password } = req.body;
+    const { token: resetCode, newPassword } = req.body;
 
-    // Hash the token
-    const resetPasswordToken = crypto
-      .createHash('sha256')
-      .update(token)
-      .digest('hex');
-
-    const user = await User.findOne({
-      resetPasswordToken,
-      resetPasswordExpire: { $gt: Date.now() }
+    // Find reset record
+    const reset = await Verification.findOne({
+      code: resetCode,
+      type: 'password-reset',
+      used: false,
+      expiresAt: { $gt: new Date() }
     });
 
-    if (!user) {
-      return res.status(400).json(
-        formatResponse(false, 'Invalid or expired reset token')
-      );
+    if (!reset) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired reset code'
+      });
     }
 
-    // Set new password
-    user.password = password;
-    user.resetPasswordToken = undefined;
-    user.resetPasswordExpire = undefined;
+    // Update user password
+    const user = await User.findOne({ matricNo: reset.matricNo }).select('+password');
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    user.password = newPassword;
     await user.save();
 
-    res.json(
-      formatResponse(true, 'Password reset successfully. You can now login with your new password.')
-    );
+    // Mark reset as used
+    reset.used = true;
+    await reset.save();
+
+    res.json({
+      success: true,
+      message: 'Password reset successfully'
+    });
+
   } catch (error) {
-    next(error);
+    console.error('Reset password error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to reset password'
+    });
   }
 };
 
-// @desc    Update user profile
-// @route   PUT /api/auth/profile
+// @desc    Verify token
+// @route   GET /api/auth/verify-token
 // @access  Private
-const updateProfile = async (req, res, next) => {
+const verifyToken = async (req, res) => {
   try {
-    const { fullName, email } = req.body;
-    const userId = req.user._id;
+    const user = await User.findById(req.user.id);
 
-    const user = await User.findById(userId);
-
-    if (!user) {
-      return res.status(404).json(
-        formatResponse(false, 'User not found')
-      );
-    }
-
-    // Check if email is being changed and if it's already taken
-    if (email && email !== user.email) {
-      const existingUser = await User.findOne({ email });
-      if (existingUser) {
-        return res.status(400).json(
-          formatResponse(false, 'Email already exists')
-        );
-      }
-      user.email = email;
-      user.isEmailVerified = false; // Require email verification again
-    }
-
-    if (fullName) {
-      user.fullName = fullName;
-    }
-
-    await user.save();
-
-    res.json(
-      formatResponse(true, 'Profile updated successfully', {
+    res.json({
+      success: true,
+      data: {
         user: {
-          _id: user._id,
-          matricNo: user.matricNo,
+          id: user._id,
+          firstName: user.firstName,
+          lastName: user.lastName,
           email: user.email,
-          fullName: user.fullName,
+          matricNo: user.matricNo,
           role: user.role,
-          isEmailVerified: user.isEmailVerified
+          faculty: user.faculty,
+          department: user.department,
+          isVerified: user.isVerified
         }
-      })
-    );
-  } catch (error) {
-    next(error);
-  }
-};
-
-// @desc    Resend verification email
-// @route   POST /api/auth/resend-verification
-// @access  Public
-const resendVerification = async (req, res, next) => {
-  try {
-    const { email } = req.body;
-
-    const user = await User.findOne({ email });
-
-    if (!user) {
-      return res.status(404).json(
-        formatResponse(false, 'User with this email does not exist')
-      );
-    }
-
-    if (user.isEmailVerified) {
-      return res.status(400).json(
-        formatResponse(false, 'Email is already verified')
-      );
-    }
-
-    // Generate new verification token
-    const emailVerificationToken = generateRandomToken();
-    user.emailVerificationToken = emailVerificationToken;
-    await user.save();
-
-    // Send verification email
-    const emailResult = await sendEmail({
-      email: user.email,
-      subject: 'Verify Your Email - YabaTech Bookstore',
-      html: verificationEmailTemplate(emailVerificationToken, user.fullName)
+      }
     });
-
-    if (!emailResult.success) {
-      console.error('Failed to send verification email:', emailResult.error);
-    }
-
-    res.json(
-      formatResponse(true, 'Verification email sent successfully', {
-        emailSent: emailResult.success
-      })
-    );
   } catch (error) {
-    next(error);
+    res.status(401).json({
+      success: false,
+      message: 'Invalid token'
+    });
   }
 };
 
 module.exports = {
-  register,
+  registerStudent,
   verifyEmail,
   login,
-  getMe,
+  adminLogin,
+  resendVerification,
   forgotPassword,
   resetPassword,
-  updateProfile,
-  resendVerification
+  verifyToken
 };

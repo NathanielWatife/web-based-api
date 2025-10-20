@@ -18,6 +18,11 @@ const orderItemSchema = new mongoose.Schema({
 });
 
 const orderSchema = new mongoose.Schema({
+  orderId: {
+    type: String,
+    unique: true,
+    required: true
+  },
   user: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -26,40 +31,60 @@ const orderSchema = new mongoose.Schema({
   items: [orderItemSchema],
   totalAmount: {
     type: Number,
-    required: true,
-    min: 0
+    required: true
   },
   status: {
     type: String,
-    enum: ['pending', 'confirmed', 'processing', 'ready for pickup', 'completed', 'cancelled'],
+    enum: ['pending', 'confirmed', 'processing', 'ready-for-pickup', 'completed', 'cancelled'],
     default: 'pending'
   },
-  pickupOption: {
+  deliveryOption: {
     type: String,
-    enum: ['library', 'bookstore'],
-    required: true
+    enum: ['pickup', 'delivery'],
+    default: 'pickup'
   },
+  deliveryAddress: String,
   paymentStatus: {
     type: String,
-    enum: ['pending', 'paid', 'failed'],
+    enum: ['pending', 'successful', 'failed', 'refunded'],
     default: 'pending'
   },
   paymentReference: String,
-  shippingAddress: {
-    fullName: String,
-    matricNo: String,
-    department: String
+  paymentMethod: String,
+  notes: String,
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now
   }
-}, {
-  timestamps: true
 });
 
-// Calculate total amount before saving
+// Generate custom order ID before saving
 orderSchema.pre('save', function(next) {
-  this.totalAmount = this.items.reduce((total, item) => {
-    return total + (item.quantity * item.price);
-  }, 0);
+  if (this.isNew) {
+    const timestamp = Date.now().toString().slice(-6);
+    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    this.orderId = `ORD-${timestamp}-${random}`;
+  }
+  this.updatedAt = Date.now();
   next();
+});
+
+// Update stock quantities when order is confirmed
+orderSchema.post('save', async function(doc) {
+  if (doc.status === 'confirmed' && doc.paymentStatus === 'successful') {
+    const Book = mongoose.model('Book');
+    
+    for (const item of doc.items) {
+      await Book.findByIdAndUpdate(
+        item.book,
+        { $inc: { stockQuantity: -item.quantity } }
+      );
+    }
+  }
 });
 
 module.exports = mongoose.model('Order', orderSchema);
