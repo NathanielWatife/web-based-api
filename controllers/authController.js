@@ -59,18 +59,7 @@ const registerStudent = async (req, res) => {
       expiresAt
     });
 
-    // Send verification email
-    try {
-      await sendEmail({
-        email: user.email,
-        subject: 'Verify Your Email - YabaTech BookStore',
-        html: emailTemplates.verification(user.firstName, verificationCode)
-      });
-    } catch (emailError) {
-      console.error('Email sending failed:', emailError);
-      // Continue even if email fails
-    }
-
+    // Respond immediately to avoid client timeouts on slow email providers
     res.status(201).json({
       success: true,
       message: 'Registration successful. Please check your email for verification code.',
@@ -83,6 +72,21 @@ const registerStudent = async (req, res) => {
           matricNo: user.matricNo
         }
       }
+    });
+
+    // Send verification email asynchronously (non-blocking)
+    sendEmail({
+      email: user.email,
+      subject: 'Verify Your Email - YabaTech BookStore',
+      html: emailTemplates.verification(user.firstName, verificationCode)
+    })
+    .then((info) => {
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('Verification email sent:', info?.messageId || 'ok');
+      }
+    })
+    .catch((emailError) => {
+      console.error('Email sending failed:', emailError?.message || emailError);
     });
 
   } catch (error) {
