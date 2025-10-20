@@ -1,6 +1,31 @@
 const nodemailer = require('nodemailer');
+let sgMail = null;
+try {
+  sgMail = require('@sendgrid/mail');
+} catch (_) {
+  // optional dependency
+}
 
 const sendEmail = async (options) => {
+  // If SendGrid API key is present, use HTTPS-based sending (more reliable on serverless hosts)
+  if (process.env.SENDGRID_API_KEY && sgMail) {
+    try {
+      sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+      const from = process.env.DEFAULT_FROM_EMAIL || process.env.EMAIL_USER;
+      const msg = {
+        to: options.email,
+        from,
+        subject: options.subject,
+        html: options.html,
+      };
+      const [resp] = await sgMail.send(msg);
+      return { messageId: resp?.headers?.['x-message-id'] || resp?.headers?.['x-message-id'] };
+    } catch (err) {
+      console.error('SendGrid send failed:', err?.message || err);
+      // fall through to SMTP fallback
+    }
+  }
+
   // Prefer explicit host/port for reliability on hosting providers
   const service = process.env.EMAIL_SERVICE; // e.g., 'gmail'
   const port = Number(process.env.EMAIL_PORT || (service === 'gmail' ? 465 : 587));

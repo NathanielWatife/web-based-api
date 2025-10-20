@@ -289,7 +289,7 @@ const resendVerification = async (req, res) => {
       });
     }
 
-    // Generate new verification code
+  // Generate new verification code
     const verificationCode = generateVerificationCode();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
@@ -300,21 +300,26 @@ const resendVerification = async (req, res) => {
       expiresAt
     });
 
-    // Send verification email
-    try {
-      await sendEmail({
-        email: user.email,
-        subject: 'Verify Your Email - YabaTech BookStore',
-        html: emailTemplates.verification(user.firstName, verificationCode)
-      });
-    } catch (emailError) {
-      console.error('Email sending failed:', emailError);
-    }
-
+    // Respond immediately to avoid client timeouts
     res.json({
       success: true,
       message: 'Verification code sent successfully'
     });
+
+    // Send email asynchronously
+    sendEmail({
+      email: user.email,
+      subject: 'Verify Your Email - YabaTech BookStore',
+      html: emailTemplates.verification(user.firstName, verificationCode)
+    })
+      .then((info) => {
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('Resend verification email sent:', info?.messageId || 'ok');
+        }
+      })
+      .catch((emailError) => {
+        console.error('Email sending failed:', emailError?.message || emailError);
+      });
 
   } catch (error) {
     console.error('Resend verification error:', error);
@@ -352,21 +357,26 @@ const forgotPassword = async (req, res) => {
       expiresAt
     });
 
-    // Send reset email
-    try {
-      await sendEmail({
-        email: user.email,
-        subject: 'Password Reset - YabaTech BookStore',
-        html: emailTemplates.passwordReset(user.firstName, resetCode)
-      });
-    } catch (emailError) {
-      console.error('Email sending failed:', emailError);
-    }
-
+    // Respond immediately
     res.json({
       success: true,
       message: 'Password reset instructions sent to your email'
     });
+
+    // Send reset email asynchronously
+    sendEmail({
+      email: user.email,
+      subject: 'Password Reset - YabaTech BookStore',
+      html: emailTemplates.passwordReset(user.firstName, resetCode)
+    })
+      .then((info) => {
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('Password reset email sent:', info?.messageId || 'ok');
+        }
+      })
+      .catch((emailError) => {
+        console.error('Email sending failed:', emailError?.message || emailError);
+      });
 
   } catch (error) {
     console.error('Forgot password error:', error);
