@@ -30,10 +30,7 @@ const corsOptions = {
     if (!origin) return callback(null, true);
     
     const allowedOrigins = [
-      'http://localhost:3000',
-      'http://127.0.0.1:3000',
-      'https://localhost:3000',
-      process.env.CLIENT_URL
+      process.env.FRONTEND_URL
     ].filter(Boolean); // Remove any undefined values
 
     if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
@@ -87,7 +84,7 @@ app.get('/', (req, res) => {
   res.json({ 
     message: 'YabaTech BookStore API is running!',
     version: '1.0.0',
-    environment: process.env.NODE_ENV,
+    environment: process.env.NODE_ENV === 'production' ? 'production' : 'development',
     timestamp: new Date().toISOString()
   });
 });
@@ -98,11 +95,11 @@ app.get('/health', (req, res) => {
   
   res.status(200).json({
     status: 'OK',
-    environment: process.env.NODE_ENV,
+    environment: process.env.NODE_ENV === 'production' ? 'production' : 'development',
     database: dbStatus,
     timestamp: new Date().toISOString(),
     cors: {
-      allowedOrigins: ['http://localhost:3000', 'http://127.0.0.1:3000', process.env.CLIENT_URL].filter(Boolean)
+      allowedOrigins: [process.env.FRONTEND_URL].filter(Boolean)
     }
   });
 });
@@ -118,13 +115,13 @@ app.use((req, res) => {
   });
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT;
 
 const server = app.listen(PORT, () => {
-  console.log(`🚀 Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
-  console.log(`📚 YabaTech BookStore API: http://localhost:${PORT}`);
-  console.log(`❤️  Health check: http://localhost:${PORT}/health`);
-  console.log(`🌐 CORS enabled for: http://localhost:3000`);
+  console.log(`🚀 Server running in ${process.env.NODE_ENV === 'production' ? 'production' : 'development'} mode on port ${PORT}`);
+  console.log(`📚 YabaTech BookStore API: ${process.env.FRONTEND_URL}`);
+  console.log(`❤️  Health check: ${process.env.FRONTEND_URL}/health`);
+  console.log(`🌐 CORS enabled for: ${process.env.FRONTEND_URL}`);
   
   // Check payment gateway configuration
   if (!process.env.PAYSTACK_SECRET_KEY && !process.env.FLUTTERWAVE_SECRET_KEY) {
