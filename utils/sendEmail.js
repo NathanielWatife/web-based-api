@@ -1,25 +1,65 @@
 const nodemailer = require('nodemailer');
 
 const sendEmail = async (options) => {
-  // Create transporter
+  // Prefer explicit host/port for reliability on hosting providers
+  const service = process.env.EMAIL_SERVICE; // e.g., 'gmail'
+  const port = Number(process.env.EMAIL_PORT || (service === 'gmail' ? 465 : 587));
+  const host = process.env.EMAIL_HOST || (service === 'gmail' ? 'smtp.gmail.com' : undefined);
+  const secure = port === 465; // true for 465, false for 587 (STARTTLS)
+
   const transporter = nodemailer.createTransport({
-    service: process.env.EMAIL_SERVICE,
+    host,
+    port,
+    secure,
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
     },
+    // Connection pool to improve stability and avoid repeated handshakes
+    pool: true,
+    maxConnections: 2,
+    maxMessages: 50,
+    // Timeouts to avoid hanging sockets
+    connectionTimeout: Number(process.env.EMAIL_CONNECTION_TIMEOUT || 15000),
+    greetingTimeout: Number(process.env.EMAIL_GREETING_TIMEOUT || 10000),
+    socketTimeout: Number(process.env.EMAIL_SOCKET_TIMEOUT || 20000),
+    tls: {
+      // Enforce modern TLS without disabling verification
+      ciphers: 'TLSv1.2',
+      rejectUnauthorized: true,
+    },
   });
 
-  // Define email options
+  const from = process.env.DEFAULT_FROM_EMAIL
+    ? process.env.DEFAULT_FROM_EMAIL
+    : `YabaTech BookStore <${process.env.EMAIL_USER}>`;
+
   const mailOptions = {
-    from: `YabaTech BookStore <${process.env.EMAIL_USER}>`,
+    from,
     to: options.email,
     subject: options.subject,
     html: options.html,
   };
 
-  // Send email
-  await transporter.sendMail(mailOptions);
+  // Simple retry to mitigate transient timeouts
+  const maxAttempts = Number(process.env.EMAIL_MAX_ATTEMPTS || 2);
+  let lastError;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const info = await transporter.sendMail(mailOptions);
+      return info;
+    } catch (err) {
+      lastError = err;
+      const code = err && (err.code || err.responseCode);
+      console.error(`Email attempt ${attempt} failed${code ? ` (${code})` : ''}:`, err.message || err);
+      if (attempt < maxAttempts) {
+        // small backoff
+        await new Promise((res) => setTimeout(res, 1000 * attempt));
+        continue;
+      }
+    }
+  }
+  throw lastError;
 };
 
 // Email templates
