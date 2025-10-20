@@ -33,7 +33,7 @@ const corsOptions = {
       process.env.FRONTEND_URL
     ].filter(Boolean); // Remove any undefined values
 
-    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
+    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
@@ -84,7 +84,7 @@ app.get('/', (req, res) => {
   res.json({ 
     message: 'YabaTech BookStore API is running!',
     version: '1.0.0',
-    environment: process.env.NODE_ENV === 'production' ? 'production' : 'development',
+    environment: process.env.NODE_ENV,
     timestamp: new Date().toISOString()
   });
 });
@@ -95,7 +95,7 @@ app.get('/health', (req, res) => {
   
   res.status(200).json({
     status: 'OK',
-    environment: process.env.NODE_ENV === 'production' ? 'production' : 'development',
+    environment: process.env.NODE_ENV,
     database: dbStatus,
     timestamp: new Date().toISOString(),
     cors: {
