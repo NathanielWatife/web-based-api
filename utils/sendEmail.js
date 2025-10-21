@@ -1,40 +1,36 @@
 const nodemailer = require('nodemailer');
 
 const sendEmail = async (options) => {
-  // Prefer explicit host/port for reliability on hosting providers
-  const service = process.env.EMAIL_SERVICE; // e.g., 'gmail'
-  const port = Number(process.env.EMAIL_PORT || (service === 'gmail' ? 465 : 587));
-  const host = process.env.EMAIL_HOST || (service === 'gmail' ? 'smtp.gmail.com' : undefined);
-  const secure = port === 465; // true for 465, false for 587 (STARTTLS)
+  // For cloud environments, use service-based configuration
+  const service = process.env.EMAIL_SERVICE; // 'gmail'
+  const port = Number(process.env.EMAIL_PORT || 587); // Use 587 for better compatibility
+  const host = process.env.EMAIL_HOST || 'smtp.gmail.com';
+  
+  // Use STARTTLS (port 587) instead of SSL (port 465) for better cloud compatibility
+  const secure = port === 465;
 
   const transporter = nodemailer.createTransport({
-    host,
-    port,
-    secure,
+    service: service, // Use service name directly
+    host: host,
+    port: port,
+    secure: secure,
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
     },
-    // Connection pool to improve stability and avoid repeated handshakes
+    // Simpler configuration for cloud environments
     pool: true,
-    maxConnections: Number(process.env.EMAIL_MAX_CONNECTIONS || 3),
-    maxMessages: Number(process.env.EMAIL_MAX_MESSAGES || 100),
-    keepAlive: true,
-    // Timeouts to avoid hanging sockets
-    connectionTimeout: Number(process.env.EMAIL_CONNECTION_TIMEOUT || 30000),
-    greetingTimeout: Number(process.env.EMAIL_GREETING_TIMEOUT || 20000),
-    socketTimeout: Number(process.env.EMAIL_SOCKET_TIMEOUT || 45000),
+    maxConnections: 2, // Reduced for cloud environments
+    maxMessages: 100,
+    // Shorter timeouts for cloud environments
+    connectionTimeout: 30000,
+    greetingTimeout: 15000,
+    socketTimeout: 30000,
+    // More permissive TLS settings for cloud
     tls: {
-      // Enforce modern TLS without disabling verification
-      minVersion: 'TLSv1.2',
-      ciphers: 'TLSv1.2',
-      rejectUnauthorized: String(process.env.EMAIL_TLS_REJECT_UNAUTHORIZED || 'true') === 'true',
-      servername: host,
+      rejectUnauthorized: false, // Set to false for cloud environments
     },
-    // Optional debug
-    logger: String(process.env.EMAIL_DEBUG || 'false') === 'true',
-    debug: String(process.env.EMAIL_DEBUG || 'false') === 'true',
-    name: process.env.EMAIL_EHLO_NAME || undefined,
+    debug: process.env.NODE_ENV === 'development',
   });
 
   const from = process.env.DEFAULT_FROM_EMAIL
@@ -48,25 +44,29 @@ const sendEmail = async (options) => {
     html: options.html,
   };
 
-  // Simple retry to mitigate transient timeouts
   const maxAttempts = Number(process.env.EMAIL_MAX_ATTEMPTS || 3);
   let lastError;
+  
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
+      console.log(`Attempting to send email (attempt ${attempt})...`);
       const info = await transporter.sendMail(mailOptions);
+      console.log('Email sent successfully:', info.messageId);
       return info;
     } catch (err) {
       lastError = err;
-      const code = err && (err.code || err.responseCode);
-      console.error(`Email attempt ${attempt} failed${code ? ` (${code})` : ''}:`, err.message || err);
+      console.error(`Email attempt ${attempt} failed:`, err.message);
+      
       if (attempt < maxAttempts) {
-        // small backoff
-        const backoffMs = Number(process.env.EMAIL_RETRY_BACKOFF_MS || 2000) * attempt; // 2s, 4s, 6s
+        const backoffMs = 2000 * attempt; // 2s, 4s
+        console.log(`Retrying in ${backoffMs}ms...`);
         await new Promise((res) => setTimeout(res, backoffMs));
         continue;
       }
     }
   }
+  
+  console.error('All email attempts failed');
   throw lastError;
 };
 
