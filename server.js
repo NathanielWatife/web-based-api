@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const connectDB = require('./config/db');
+const bootstrapAdmin = require('./config/bootstrapAdmin');
 const errorHandler = require('./middleware/errorMiddleware');
 
 // Load env vars
@@ -117,7 +118,7 @@ app.use((req, res) => {
 
 const PORT = process.env.PORT;
 
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, async () => {
   console.log(`🚀 Server running in ${process.env.NODE_ENV === 'production' ? 'production' : 'development'} mode on port ${PORT}`);
   console.log(`📚 YabaTech BookStore API: ${process.env.FRONTEND_URL}`);
   console.log(`❤️  Health check: ${process.env.FRONTEND_URL}/health`);
@@ -127,6 +128,9 @@ const server = app.listen(PORT, () => {
   if (!process.env.PAYSTACK_SECRET_KEY && !process.env.FLUTTERWAVE_SECRET_KEY) {
     console.log('⚠️  Payment gateways not configured - using mock payments for development');
   }
+
+  // Bootstrap admin account if missing
+  await bootstrapAdmin();
 });
 
 // Handle graceful shutdown
