@@ -1,31 +1,6 @@
 const nodemailer = require('nodemailer');
-let sgMail = null;
-try {
-  sgMail = require('@sendgrid/mail');
-} catch (_) {
-  // optional dependency
-}
 
 const sendEmail = async (options) => {
-  // If SendGrid API key is present, use HTTPS-based sending (more reliable on serverless hosts)
-  if (process.env.SENDGRID_API_KEY && sgMail) {
-    try {
-      sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-      const from = process.env.DEFAULT_FROM_EMAIL || process.env.EMAIL_USER;
-      const msg = {
-        to: options.email,
-        from,
-        subject: options.subject,
-        html: options.html,
-      };
-      const [resp] = await sgMail.send(msg);
-      return { messageId: resp?.headers?.['x-message-id'] || resp?.headers?.['x-message-id'] };
-    } catch (err) {
-      console.error('SendGrid send failed:', err?.message || err);
-      // fall through to SMTP fallback
-    }
-  }
-
   // Prefer explicit host/port for reliability on hosting providers
   const service = process.env.EMAIL_SERVICE; // e.g., 'gmail'
   const port = Number(process.env.EMAIL_PORT || (service === 'gmail' ? 465 : 587));
@@ -42,17 +17,24 @@ const sendEmail = async (options) => {
     },
     // Connection pool to improve stability and avoid repeated handshakes
     pool: true,
-    maxConnections: 2,
-    maxMessages: 50,
+    maxConnections: Number(process.env.EMAIL_MAX_CONNECTIONS || 3),
+    maxMessages: Number(process.env.EMAIL_MAX_MESSAGES || 100),
+    keepAlive: true,
     // Timeouts to avoid hanging sockets
-    connectionTimeout: Number(process.env.EMAIL_CONNECTION_TIMEOUT || 15000),
-    greetingTimeout: Number(process.env.EMAIL_GREETING_TIMEOUT || 10000),
-    socketTimeout: Number(process.env.EMAIL_SOCKET_TIMEOUT || 20000),
+    connectionTimeout: Number(process.env.EMAIL_CONNECTION_TIMEOUT || 30000),
+    greetingTimeout: Number(process.env.EMAIL_GREETING_TIMEOUT || 20000),
+    socketTimeout: Number(process.env.EMAIL_SOCKET_TIMEOUT || 45000),
     tls: {
       // Enforce modern TLS without disabling verification
+      minVersion: 'TLSv1.2',
       ciphers: 'TLSv1.2',
-      rejectUnauthorized: true,
+      rejectUnauthorized: String(process.env.EMAIL_TLS_REJECT_UNAUTHORIZED || 'true') === 'true',
+      servername: host,
     },
+    // Optional debug
+    logger: String(process.env.EMAIL_DEBUG || 'false') === 'true',
+    debug: String(process.env.EMAIL_DEBUG || 'false') === 'true',
+    name: process.env.EMAIL_EHLO_NAME || undefined,
   });
 
   const from = process.env.DEFAULT_FROM_EMAIL
@@ -67,7 +49,7 @@ const sendEmail = async (options) => {
   };
 
   // Simple retry to mitigate transient timeouts
-  const maxAttempts = Number(process.env.EMAIL_MAX_ATTEMPTS || 2);
+  const maxAttempts = Number(process.env.EMAIL_MAX_ATTEMPTS || 3);
   let lastError;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
@@ -79,7 +61,8 @@ const sendEmail = async (options) => {
       console.error(`Email attempt ${attempt} failed${code ? ` (${code})` : ''}:`, err.message || err);
       if (attempt < maxAttempts) {
         // small backoff
-        await new Promise((res) => setTimeout(res, 1000 * attempt));
+        const backoffMs = Number(process.env.EMAIL_RETRY_BACKOFF_MS || 2000) * attempt; // 2s, 4s, 6s
+        await new Promise((res) => setTimeout(res, backoffMs));
         continue;
       }
     }
