@@ -1,59 +1,29 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
+// Initialize Resend client using your API key from .env
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+// Generic email sender function
 const sendEmail = async (options) => {
-  // Use direct Gmail configuration
-  const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-    // Optimized for cloud environments
-    connectionTimeout: 60000, // Increased to 60 seconds
-    greetingTimeout: 30000,   // Increased to 30 seconds
-    socketTimeout: 60000,     // Increased to 60 seconds
-    // Important: Disable TLS certificate verification for cloud
-    tls: {
-      rejectUnauthorized: false
-    },
-    // Enable debug logging
-    debug: true,
-    logger: true
-  });
-
-  const from = `YabaTech BookStore <${process.env.EMAIL_USER}>`;
-
-  const mailOptions = {
-    from,
-    to: options.email,
-    subject: options.subject,
-    html: options.html,
-  };
-
   console.log(`📧 Attempting to send email to: ${options.email}`);
-  console.log(`📧 Using SMTP: smtp.gmail.com:587`);
-  
+
   try {
-    // First, verify the connection
-    console.log('🔧 Verifying email configuration...');
-    await transporter.verify();
-    console.log('✅ Email configuration verified successfully');
-    
-    // Then send the email
-    console.log('🚀 Sending email...');
-    const info = await transporter.sendMail(mailOptions);
-    console.log('✅ Email sent successfully:', info.messageId);
-    return info;
+    const data = await resend.emails.send({
+      from: 'YabaTech BookStore <noreply@yabatechbookstore.com>', // change after domain verification
+      to: options.email,
+      subject: options.subject,
+      html: options.html,
+    });
+
+    console.log('✅ Email sent successfully:', data);
+    return data;
   } catch (error) {
     console.error('❌ Email sending failed:', error);
     throw error;
-  } finally {
-    // Close the transporter
-    transporter.close();
   }
 };
 
-
+// Email templates (same as before)
 const emailTemplates = {
   verification: (name, code) => `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
