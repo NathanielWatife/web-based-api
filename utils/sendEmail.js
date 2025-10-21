@@ -1,6 +1,5 @@
 const { Resend } = require('resend');
 
-// Initialize Resend client using your API key from .env
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Generic email sender function
@@ -9,7 +8,7 @@ const sendEmail = async (options) => {
 
   try {
     const data = await resend.emails.send({
-      from: 'YabaTech BookStore <noreply@yabatechbookstore.com>', // change after domain verification
+      from: 'YabaTech BookStore <onboarding@resend.dev>',
       to: options.email,
       subject: options.subject,
       html: options.html,
