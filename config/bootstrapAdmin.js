@@ -24,13 +24,13 @@ module.exports = async function bootstrapAdmin() {
     // Matric number must match schema regex: ^[A-Z]\/[A-Z]{2}\/\d{2}\/\d+$
     const yy = new Date().getFullYear().toString().slice(-2);
     const defaultMatric = `A/AD/${yy}/000001`;
-    // const matricNo = (process.env.ADMIN_MATRIC_NO || defaultMatric).toUpperCase();
+    const matricNo = (process.env.ADMIN_MATRIC_NO || defaultMatric).toUpperCase();
 
     await User.create({
       firstName,
       lastName,
       email,
-    //   matricNo,
+      matricNo,
       password,
       role: 'admin',
       isVerified: true,
