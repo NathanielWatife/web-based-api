@@ -1,41 +1,27 @@
 const nodemailer = require('nodemailer');
 
 const sendEmail = async (options) => {
-  // For cloud environments, use service-based configuration
-  const service = process.env.EMAIL_SERVICE; // 'gmail'
-  const port = Number(process.env.EMAIL_PORT || 587); // Use 587 for better compatibility
-  const host = process.env.EMAIL_HOST || 'smtp.gmail.com';
-  
-  // Use STARTTLS (port 587) instead of SSL (port 465) for better cloud compatibility
-  const secure = port === 465;
-
+  // Use direct Gmail configuration
   const transporter = nodemailer.createTransport({
-    service: service, // Use service name directly
-    host: host,
-    port: port,
-    secure: secure,
+    service: 'gmail',
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
     },
-    // Simpler configuration for cloud environments
-    pool: true,
-    maxConnections: 2, // Reduced for cloud environments
-    maxMessages: 100,
-    // Shorter timeouts for cloud environments
-    connectionTimeout: 30000,
-    greetingTimeout: 15000,
-    socketTimeout: 30000,
-    // More permissive TLS settings for cloud
+    // Optimized for cloud environments
+    connectionTimeout: 60000, // Increased to 60 seconds
+    greetingTimeout: 30000,   // Increased to 30 seconds
+    socketTimeout: 60000,     // Increased to 60 seconds
+    // Important: Disable TLS certificate verification for cloud
     tls: {
-      rejectUnauthorized: false, // Set to false for cloud environments
+      rejectUnauthorized: false
     },
-    debug: process.env.NODE_ENV === 'development',
+    // Enable debug logging
+    debug: true,
+    logger: true
   });
 
-  const from = process.env.DEFAULT_FROM_EMAIL
-    ? process.env.DEFAULT_FROM_EMAIL
-    : `YabaTech BookStore <${process.env.EMAIL_USER}>`;
+  const from = `YabaTech BookStore <${process.env.EMAIL_USER}>`;
 
   const mailOptions = {
     from,
@@ -44,33 +30,30 @@ const sendEmail = async (options) => {
     html: options.html,
   };
 
-  const maxAttempts = Number(process.env.EMAIL_MAX_ATTEMPTS || 3);
-  let lastError;
+  console.log(`📧 Attempting to send email to: ${options.email}`);
+  console.log(`📧 Using SMTP: smtp.gmail.com:587`);
   
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      console.log(`Attempting to send email (attempt ${attempt})...`);
-      const info = await transporter.sendMail(mailOptions);
-      console.log('Email sent successfully:', info.messageId);
-      return info;
-    } catch (err) {
-      lastError = err;
-      console.error(`Email attempt ${attempt} failed:`, err.message);
-      
-      if (attempt < maxAttempts) {
-        const backoffMs = 2000 * attempt; // 2s, 4s
-        console.log(`Retrying in ${backoffMs}ms...`);
-        await new Promise((res) => setTimeout(res, backoffMs));
-        continue;
-      }
-    }
+  try {
+    // First, verify the connection
+    console.log('🔧 Verifying email configuration...');
+    await transporter.verify();
+    console.log('✅ Email configuration verified successfully');
+    
+    // Then send the email
+    console.log('🚀 Sending email...');
+    const info = await transporter.sendMail(mailOptions);
+    console.log('✅ Email sent successfully:', info.messageId);
+    return info;
+  } catch (error) {
+    console.error('❌ Email sending failed:', error);
+    throw error;
+  } finally {
+    // Close the transporter
+    transporter.close();
   }
-  
-  console.error('All email attempts failed');
-  throw lastError;
 };
 
-// Email templates
+
 const emailTemplates = {
   verification: (name, code) => `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
