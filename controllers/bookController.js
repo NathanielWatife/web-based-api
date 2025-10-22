@@ -1,5 +1,20 @@
 const Book = require('../models/Book');
 const APIFeatures = require('../utils/apiFeatures');
+const cloudinary = require('../config/cloudinary');
+
+// Helper to upload buffer to Cloudinary
+const uploadBufferToCloudinary = (buffer, folder = 'books') => {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder, resource_type: 'image' },
+      (error, result) => {
+        if (error) return reject(error);
+        resolve(result);
+      }
+    );
+    stream.end(buffer);
+  });
+};
 
 // @desc    Get all books
 // @route   GET /api/books
@@ -94,7 +109,15 @@ const getCategories = async (req, res) => {
 // @access  Private/Admin
 const createBook = async (req, res) => {
   try {
-    const book = await Book.create(req.body);
+    let payload = { ...req.body };
+
+    // If image file is present, upload to Cloudinary
+    if (req.file && req.file.buffer) {
+      const uploaded = await uploadBufferToCloudinary(req.file.buffer);
+      payload.imageUrl = uploaded.secure_url;
+    }
+
+    const book = await Book.create(payload);
 
     res.status(201).json({
       success: true,
@@ -115,9 +138,17 @@ const createBook = async (req, res) => {
 // @access  Private/Admin
 const updateBook = async (req, res) => {
   try {
+    let updates = { ...req.body };
+
+    // If a new image file is present, upload and set imageUrl
+    if (req.file && req.file.buffer) {
+      const uploaded = await uploadBufferToCloudinary(req.file.buffer);
+      updates.imageUrl = uploaded.secure_url;
+    }
+
     const book = await Book.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      updates,
       { new: true, runValidators: true }
     );
 

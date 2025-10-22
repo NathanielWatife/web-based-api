@@ -8,6 +8,7 @@ const {
   deleteBook
 } = require('../controllers/bookController');
 const { protect, admin } = require('../middleware/authMiddleware');
+const { uploadSingleImage } = require('../middleware/uploadMiddleware');
 
 const router = express.Router();
 
@@ -16,8 +17,8 @@ router.get('/categories', getCategories);
 router.get('/:id', getBook);
 
 // Admin routes
-router.post('/', protect, admin, createBook);
-router.put('/:id', protect, admin, updateBook);
+router.post('/', protect, admin, uploadSingleImage, createBook);
+router.put('/:id', protect, admin, uploadSingleImage, updateBook);
 router.delete('/:id', protect, admin, deleteBook);
 
 module.exports = router;
