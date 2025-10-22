@@ -1,44 +1,71 @@
-const { Resend } = require('resend');
+const nodemailer = require('nodemailer');
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-// Generic email sender function
+// Generic email sender function (Gmail SMTP via Nodemailer)
 const sendEmail = async (options) => {
   console.log(`📧 Attempting to send email to: ${options.email}`);
 
-  try {
-    const data = await resend.emails.send({
-      from: 'YabaTech BookStore <onboarding@resend.dev>',
-      to: options.email,
-      subject: options.subject,
-      html: options.html,
-    });
+  const service = process.env.EMAIL_SERVICE;
+  const host = process.env.EMAIL_HOST;
+  const port = Number(process.env.EMAIL_PORT);
+  const secure = port === 465; // 465 = SSL/TLS
 
-    console.log('✅ Email sent successfully:', data);
-    return data;
-  } catch (error) {
-    console.error('❌ Email sending failed:', error);
-    throw error;
+  const transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure,
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS, // Gmail App Password required
+    },
+    pool: true,
+    keepAlive: true,
+    maxConnections: Number(process.env.EMAIL_MAX_CONNECTIONS || 3),
+    maxMessages: Number(process.env.EMAIL_MAX_MESSAGES || 200),
+    connectionTimeout: Number(process.env.EMAIL_CONNECTION_TIMEOUT || 30000),
+    greetingTimeout: Number(process.env.EMAIL_GREETING_TIMEOUT || 20000),
+    socketTimeout: Number(process.env.EMAIL_SOCKET_TIMEOUT || 45000),
+    tls: {
+      minVersion: 'TLSv1.2',
+      rejectUnauthorized: String(process.env.EMAIL_TLS_REJECT_UNAUTHORIZED || 'true') === 'true',
+      servername: host,
+    },
+    logger: String(process.env.EMAIL_DEBUG || 'false') === 'true',
+    debug: String(process.env.EMAIL_DEBUG || 'false') === 'true',
+    name: process.env.EMAIL_EHLO_NAME || undefined,
+  });
+
+  const from = process.env.DEFAULT_FROM_EMAIL || `YabaTech BookStore <${process.env.EMAIL_USER}>`;
+
+  const mailOptions = {
+    from,
+    to: options.email,
+    subject: options.subject,
+    html: options.html,
+  };
+
+  const maxAttempts = Number(process.env.EMAIL_MAX_ATTEMPTS || 3);
+  const backoffBase = Number(process.env.EMAIL_RETRY_BACKOFF_MS || 2000);
+
+  let lastError;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const info = await transporter.sendMail(mailOptions);
+      console.log('✅ Email sent successfully:', info?.messageId || 'ok');
+      return info;
+    } catch (error) {
+      lastError = error;
+      console.error(`❌ Email attempt ${attempt} failed:`, error?.message || error);
+      if (attempt < maxAttempts) {
+        await new Promise((res) => setTimeout(res, backoffBase * attempt));
+      }
+    }
   }
+
+  throw lastError;
 };
 
-// Email templates (same as before)
+// Email templates
 const emailTemplates = {
-  verification: (name, code) => `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <h2 style="color: #3b826f;">Welcome to YabaTech BookStore!</h2>
-      <p>Hello ${name},</p>
-      <p>Thank you for registering with YabaTech BookStore. Please use the verification code below to verify your email address:</p>
-      <div style="background: #f8fafc; padding: 20px; text-align: center; margin: 20px 0;">
-        <h1 style="color: #3b826f; margin: 0; font-size: 2rem; letter-spacing: 5px;">${code}</h1>
-      </div>
-      <p>This code will expire in 10 minutes.</p>
-      <p>If you didn't create an account, please ignore this email.</p>
-      <br>
-      <p>Best regards,<br>YabaTech BookStore Team</p>
-    </div>
-  `,
-  
   passwordReset: (name, code) => `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <h2 style="color: #3b826f;">Password Reset Request</h2>

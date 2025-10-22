@@ -34,7 +34,7 @@ const registerStudent = async (req, res) => {
       });
     }
 
-    // Create user
+    // Create user (email verification disabled)
     const user = await User.create({
       firstName,
       lastName,
@@ -45,24 +45,14 @@ const registerStudent = async (req, res) => {
       faculty,
       department,
       programme,
-      admissionYear
+      admissionYear,
+      isVerified: true
     });
 
-    // Generate verification code
-    const verificationCode = generateVerificationCode();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-
-    await Verification.create({
-      matricNo: user.matricNo,
-      code: verificationCode,
-      type: 'email-verification',
-      expiresAt
-    });
-
-    // Respond immediately to avoid client timeouts on slow email providers
+    // Respond: no email verification required
     res.status(201).json({
       success: true,
-      message: 'Registration successful. Please check your email for verification code.',
+      message: 'Registration successful. You can now log in.',
       data: {
         user: {
           id: user._id,
@@ -74,20 +64,6 @@ const registerStudent = async (req, res) => {
       }
     });
 
-    // Send verification email asynchronously (non-blocking)
-    sendEmail({
-      email: user.email,
-      subject: 'Verify Your Email - YabaTech BookStore',
-      html: emailTemplates.verification(user.firstName, verificationCode)
-    })
-    .then((info) => {
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('Verification email sent:', info?.messageId || 'ok');
-      }
-    })
-    .catch((emailError) => {
-      console.error('Email sending failed:', emailError?.message || emailError);
-    });
 
   } catch (error) {
     console.error('Registration error:', error);
@@ -98,75 +74,6 @@ const registerStudent = async (req, res) => {
   }
 };
 
-// @desc    Verify email
-// @route   POST /api/auth/verify-email
-// @access  Public
-const verifyEmail = async (req, res) => {
-  try {
-    const { matricNo, verificationCode } = req.body;
-
-    // Find verification record
-    const verification = await Verification.findOne({
-      matricNo: matricNo.toUpperCase(),
-      code: verificationCode,
-      type: 'email-verification',
-      used: false,
-      expiresAt: { $gt: new Date() }
-    });
-
-    if (!verification) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid or expired verification code'
-      });
-    }
-
-    // Update user verification status
-    const user = await User.findOneAndUpdate(
-      { matricNo: matricNo.toUpperCase() },
-      { isVerified: true },
-      { new: true }
-    );
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
-
-    // Mark verification as used
-    verification.used = true;
-    await verification.save();
-
-    // Generate token
-    const token = generateToken(user._id);
-
-    res.json({
-      success: true,
-      message: 'Email verified successfully',
-      data: {
-        token,
-        user: {
-          id: user._id,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          email: user.email,
-          matricNo: user.matricNo,
-          role: user.role,
-          isVerified: user.isVerified
-        }
-      }
-    });
-
-  } catch (error) {
-    console.error('Email verification error:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Email verification failed'
-    });
-  }
-};
 
 // @desc    Login user
 // @route   POST /api/auth/login
@@ -185,12 +92,6 @@ const login = async (req, res) => {
       });
     }
 
-    if (!user.isVerified) {
-      return res.status(401).json({
-        success: false,
-        message: 'Please verify your email address first'
-      });
-    }
 
     // Generate token
     const token = generateToken(user._id);
@@ -266,69 +167,6 @@ const adminLogin = async (req, res) => {
   }
 };
 
-// @desc    Resend verification code
-// @route   POST /api/auth/resend-verification
-// @access  Public
-const resendVerification = async (req, res) => {
-  try {
-    const { matricNo } = req.body;
-
-    const user = await User.findOne({ matricNo: matricNo.toUpperCase() });
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
-
-    if (user.isVerified) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email already verified'
-      });
-    }
-
-  // Generate new verification code
-    const verificationCode = generateVerificationCode();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-
-    await Verification.create({
-      matricNo: user.matricNo,
-      code: verificationCode,
-      type: 'email-verification',
-      expiresAt
-    });
-
-    // Respond immediately to avoid client timeouts
-    res.json({
-      success: true,
-      message: 'Verification code sent successfully'
-    });
-
-    // Send email asynchronously
-    sendEmail({
-      email: user.email,
-      subject: 'Verify Your Email - YabaTech BookStore',
-      html: emailTemplates.verification(user.firstName, verificationCode)
-    })
-      .then((info) => {
-        if (process.env.NODE_ENV !== 'production') {
-          console.log('Resend verification email sent:', info?.messageId || 'ok');
-        }
-      })
-      .catch((emailError) => {
-        console.error('Email sending failed:', emailError?.message || emailError);
-      });
-
-  } catch (error) {
-    console.error('Resend verification error:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to resend verification code'
-    });
-  }
-};
 
 // @desc    Forgot password
 // @route   POST /api/auth/forgot-password
@@ -473,10 +311,8 @@ const verifyToken = async (req, res) => {
 
 module.exports = {
   registerStudent,
-  verifyEmail,
   login,
   adminLogin,
-  resendVerification,
   forgotPassword,
   resetPassword,
   verifyToken
