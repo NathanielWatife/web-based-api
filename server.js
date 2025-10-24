@@ -24,6 +24,8 @@ connectDB();
 
 const app = express();
 
+const path = require('path');
+
 // Enhanced CORS configuration
 const corsOptions = {
   origin: function (origin, callback) {
@@ -65,6 +67,9 @@ app.options(/.*/, cors(corsOptions));
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Serve uploaded files (development fallback for image uploads)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Logging middleware
 app.use((req, res, next) => {

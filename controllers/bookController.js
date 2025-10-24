@@ -1,9 +1,23 @@
+const fs = require('fs');
+const path = require('path');
 const Book = require('../models/Book');
 const APIFeatures = require('../utils/apiFeatures');
 const cloudinary = require('../config/cloudinary');
 
+// Determine if Cloudinary is configured via env vars
+const hasCloudinary = Boolean(
+  process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET
+);
+
+// Helper to ensure a directory exists
+const ensureDir = (dir) => {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+};
+
 // Helper to upload buffer to Cloudinary
-const uploadBufferToCloudinary = (buffer, folder = 'books') => {
+const uploadBufferToCloudinary = (buffer, folder = 'books', originalName = 'image.jpg') => {
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
       { folder, resource_type: 'image' },
@@ -14,6 +28,28 @@ const uploadBufferToCloudinary = (buffer, folder = 'books') => {
     );
     stream.end(buffer);
   });
+};
+
+// Fallback: save buffer to local uploads folder and return an object resembling Cloudinary response
+const saveBufferLocally = async (buffer, folder = 'books', originalName = 'image.jpg') => {
+  const uploadsRoot = path.join(__dirname, '..', 'uploads');
+  const targetDir = path.join(uploadsRoot, folder);
+  ensureDir(targetDir);
+
+  const ext = path.extname(originalName) || '.jpg';
+  const filename = `${Date.now()}-${Math.random().toString(36).slice(2,8)}${ext}`;
+  const filePath = path.join(targetDir, filename);
+
+  await fs.promises.writeFile(filePath, buffer);
+
+  // Build a URL that points to the served uploads route on the backend
+  const port = process.env.PORT || 5000;
+  const backendUrl = process.env.BACKEND_URL || `http://localhost:${port}`;
+
+  return {
+    secure_url: `${backendUrl}/uploads/${folder}/${filename}`,
+    public_id: `local/${folder}/${filename}`
+  };
 };
 
 // @desc    Get all books
@@ -111,9 +147,14 @@ const createBook = async (req, res) => {
   try {
     let payload = { ...req.body };
 
-    // If image file is present, upload to Cloudinary
+    // If image file is present, upload to Cloudinary (or fallback to local storage)
     if (req.file && req.file.buffer) {
-      const uploaded = await uploadBufferToCloudinary(req.file.buffer);
+      let uploaded;
+      if (hasCloudinary) {
+        uploaded = await uploadBufferToCloudinary(req.file.buffer, 'books', req.file.originalname);
+      } else {
+        uploaded = await saveBufferLocally(req.file.buffer, 'books', req.file.originalname);
+      }
       payload.imageUrl = uploaded.secure_url;
     }
 
@@ -140,9 +181,14 @@ const updateBook = async (req, res) => {
   try {
     let updates = { ...req.body };
 
-    // If a new image file is present, upload and set imageUrl
+    // If a new image file is present, upload and set imageUrl (Cloudinary or local fallback)
     if (req.file && req.file.buffer) {
-      const uploaded = await uploadBufferToCloudinary(req.file.buffer);
+      let uploaded;
+      if (hasCloudinary) {
+        uploaded = await uploadBufferToCloudinary(req.file.buffer, 'books', req.file.originalname);
+      } else {
+        uploaded = await saveBufferLocally(req.file.buffer, 'books', req.file.originalname);
+      }
       updates.imageUrl = uploaded.secure_url;
     }
 
