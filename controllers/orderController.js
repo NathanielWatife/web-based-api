@@ -38,16 +38,16 @@ const createOrder = async (req, res) => {
     // Populate order with book details
     await order.populate('items.book', 'title author imageUrl');
 
-    // Send order confirmation email
-    try {
-      await sendEmail({
-        email: req.user.email,
-        subject: 'Order Confirmed - YabaTech BookStore',
-        html: emailTemplates.orderConfirmation(req.user.firstName, order)
-      });
-    } catch (emailError) {
-      console.error('Order confirmation email failed:', emailError);
-    }
+    // Send order confirmation email asynchronously so that email delays
+    // (e.g. unconfigured SMTP, external SMTP slowness) don't block the
+    // API response or cause client-side request timeouts.
+    sendEmail({
+      email: req.user.email,
+      subject: 'Order Confirmed - YabaTech BookStore',
+      html: emailTemplates.orderConfirmation(req.user.firstName, order)
+    })
+      .then((info) => console.log('Async order confirmation email result:', info?.messageId || 'ok'))
+      .catch((emailError) => console.error('Order confirmation email failed:', emailError));
 
     res.status(201).json({
       success: true,

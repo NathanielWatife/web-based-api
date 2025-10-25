@@ -4,6 +4,14 @@ const nodemailer = require('nodemailer');
 const sendEmail = async (options) => {
   console.log(`📧 Attempting to send email to: ${options.email}`);
 
+  // Quick guard: if essential SMTP config is missing, skip sending and
+  // return early. This prevents long delays when running locally without
+  // SMTP configured (development) and avoids blocking API responses.
+  if (!process.env.EMAIL_HOST && !process.env.EMAIL_SERVICE) {
+    console.warn('Email configuration not provided (EMAIL_HOST or EMAIL_SERVICE). Skipping sendEmail.');
+    return { skipped: true, message: 'Email skipped: not configured' };
+  }
+
   const service = process.env.EMAIL_SERVICE;
   const host = process.env.EMAIL_HOST;
   const port = Number(process.env.EMAIL_PORT);
