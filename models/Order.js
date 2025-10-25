@@ -62,9 +62,9 @@ const orderSchema = new mongoose.Schema({
   }
 });
 
-// Generate custom order ID before saving
-orderSchema.pre('save', function(next) {
-  if (this.isNew) {
+// Generate custom order ID before validation so it's present for required checks
+orderSchema.pre('validate', function(next) {
+  if (this.isNew && !this.orderId) {
     const timestamp = Date.now().toString().slice(-6);
     const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
     this.orderId = `ORD-${timestamp}-${random}`;
