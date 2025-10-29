@@ -366,8 +366,27 @@ const verifyEmail = async (req, res) => {
     // Mark verification as used
     record.used = true;
     await record.save();
+    // Generate auth token so the user can be signed-in immediately after verification
+    const token = generateToken(user._id);
 
-    res.json({ success: true, message: 'Email verified successfully' });
+    res.json({
+      success: true,
+      message: 'Email verified successfully',
+      data: {
+        token,
+        user: {
+          id: user._id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          matricNo: user.matricNo,
+          role: user.role,
+          faculty: user.faculty,
+          department: user.department,
+          isVerified: user.isVerified
+        }
+      }
+    });
   } catch (error) {
     console.error('Verify email error:', error);
     res.status(500).json({ success: false, message: error.message || 'Failed to verify email' });
