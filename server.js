@@ -29,38 +29,38 @@ if (missingEnvVars.length > 0) {
 
     const path = require('path');
 
-    // Enhanced CORS configuration
-    const corsOptions = {
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    const allowedOrigins = [
-      process.env.FRONTEND_URL
-    ].filter(Boolean); // Remove any undefined values
+    // Simple CORS configuration using only environment variables
+    // FRONTEND_URLS: comma-separated list of allowed origins
+    // FRONTEND_URL: single allowed origin
+    const allowedOrigins = (process.env.FRONTEND_URL)
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
 
-    // Allow any origin only in non-production environments
-    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: [
-    'Content-Type',
-    'Authorization',
-    'X-Requested-With',
-    'Accept',
-    'Origin',
-    'Access-Control-Request-Method',
-    'Access-Control-Request-Headers'
-  ],
-  exposedHeaders: ['Content-Range', 'X-Content-Range'],
-  preflightContinue: false,
-  optionsSuccessStatus: 204
-};
+    console.log('CORS allowed origins (env):', allowedOrigins);
+
+    const corsOptions = {
+      origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes(origin)) return callback(null, true);
+        return callback(new Error('Not allowed by CORS'));
+      },
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+      allowedHeaders: [
+        'Content-Type',
+        'Authorization',
+        'X-Requested-With',
+        'Accept',
+        'Origin',
+        'Access-Control-Request-Method',
+        'Access-Control-Request-Headers'
+      ],
+      exposedHeaders: ['Content-Range', 'X-Content-Range'],
+      preflightContinue: false,
+      optionsSuccessStatus: 204
+    };
 
     // Apply CORS middleware
     app.use(cors(corsOptions));
@@ -109,7 +109,7 @@ if (missingEnvVars.length > 0) {
         database: dbStatus,
         timestamp: new Date().toISOString(),
         cors: {
-          allowedOrigins: [process.env.FRONTEND_URL].filter(Boolean)
+          allowedOrigins
         }
       });
     });
@@ -129,9 +129,7 @@ if (missingEnvVars.length > 0) {
 
     const server = app.listen(PORT, async () => {
       console.log(`🚀 Server running in ${process.env.NODE_ENV === 'production' ? 'production' : 'development'} mode on port ${PORT}`);
-      console.log(`📚 YabaTech BookStore API: ${process.env.FRONTEND_URL}`);
-      console.log(`❤️  Health check: ${process.env.FRONTEND_URL}/health`);
-      console.log(`🌐 CORS enabled for: ${process.env.FRONTEND_URL}`);
+  console.log(`🌐 CORS enabled for: ${allowedOrigins.join(', ') || '(none configured)'}`);
       
       // Check payment gateway configuration
       if (!process.env.PAYSTACK_SECRET_KEY && !process.env.FLUTTERWAVE_SECRET_KEY) {
