@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const Book = require('../models/Book');
 const Order = require('../models/Order');
+const { sendEmail, emailTemplates } = require('../utils/sendEmail');
 
 // @desc    Get dashboard stats
 // @route   GET /api/admin/dashboard
@@ -107,6 +108,19 @@ const updateOrderStatus = async (req, res) => {
         success: false,
         message: 'Order not found'
       });
+    }
+
+    // Notify user about status change (async)
+    try {
+      if (order && order.user && order.user.email) {
+        sendEmail({
+          email: order.user.email,
+          subject: `Order ${order.orderId} - Status Updated`,
+          html: emailTemplates.orderStatusUpdate(order.user.firstName || '', order, status)
+        }).catch((e) => console.error('Failed to send order status email:', e));
+      }
+    } catch (e) {
+      console.error('Order status notification error:', e);
     }
 
     res.json({

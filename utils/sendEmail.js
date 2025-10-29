@@ -107,4 +107,54 @@ const emailTemplates = {
   `
 };
 
+// Additional templates
+emailTemplates.emailVerification = (name, code) => `
+  <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+    <h2 style="color: #3b826f;">Verify Your Email</h2>
+    <p>Hello ${name || 'Student'},</p>
+    <p>Welcome to YabaTech BookStore. Please use the 6-digit code below to verify your email address:</p>
+    <div style="background: #f8fafc; padding: 20px; text-align: center; margin: 20px 0;">
+      <h1 style="color: #3b826f; margin: 0; font-size: 2rem; letter-spacing: 5px;">${code}</h1>
+    </div>
+    <p>This code will expire in 10 minutes.</p>
+    <br>
+    <p>Best regards,<br>YabaTech BookStore Team</p>
+  </div>
+`;
+
+emailTemplates.orderStatusUpdate = (name, order, status) => `
+  <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+    <h2 style="color: #3b826f;">Order Update</h2>
+    <p>Hello ${name},</p>
+    <p>Your order <strong>${order.orderId}</strong> status has been updated to <strong>${status}</strong>.</p>
+    <div style="background: #f8fafc; padding: 20px; margin: 20px 0;">
+      <p><strong>Order ID:</strong> ${order.orderId}</p>
+      <p><strong>Total Amount:</strong> ₦${order.totalAmount.toLocaleString()}</p>
+      <p><strong>Current Status:</strong> ${status}</p>
+    </div>
+    <p>If you have questions, reply to this email or contact support.</p>
+    <br>
+    <p>Best regards,<br>YabaTech BookStore Team</p>
+  </div>
+`;
+
+emailTemplates.adminNewOrder = (adminName, order, student) => `
+  <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+    <h2 style="color: #3b826f;">New Order Placed</h2>
+    <p>Hello ${adminName || 'Admin'},</p>
+    <p>A new order has been placed by <strong>${student.firstName} ${student.lastName}</strong> (${student.matricNo}).</p>
+    <div style="background: #f8fafc; padding: 20px; margin: 20px 0;">
+      <p><strong>Order ID:</strong> ${order.orderId}</p>
+      <p><strong>Total Amount:</strong> ₦${order.totalAmount.toLocaleString()}</p>
+      <p><strong>Items:</strong></p>
+      <ul>
+        ${order.items.map(i => `<li>${i.quantity} x ${i.book.title || i.book}</li>`).join('')}
+      </ul>
+    </div>
+    <p>Visit the admin dashboard to process this order.</p>
+    <br>
+    <p>Best regards,<br>YabaTech BookStore System</p>
+  </div>
+`;
+
 module.exports = { sendEmail, emailTemplates };

@@ -4,6 +4,8 @@ const generateToken = require('../utils/generateToken');
 const { sendEmail, emailTemplates } = require('../utils/sendEmail');
 const generateVerificationCode = require('../utils/generateVerificationCode');
 
+// Verification types used in this controller: 'email-verification', 'password-reset'
+
 // @desc    Register student
 // @route   POST /api/auth/register
 // @access  Public
@@ -34,7 +36,7 @@ const registerStudent = async (req, res) => {
       });
     }
 
-    // Create user (email verification disabled)
+    // Create user (email verification enabled)
     const user = await User.create({
       firstName,
       lastName,
@@ -46,13 +48,24 @@ const registerStudent = async (req, res) => {
       department,
       programme,
       admissionYear,
-      isVerified: true
+      isVerified: false
     });
 
-    // Respond: no email verification required
+    // Generate verification code and persist
+    const verificationCode = generateVerificationCode();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    await Verification.create({
+      matricNo: user.matricNo,
+      code: verificationCode,
+      type: 'email-verification',
+      expiresAt
+    });
+
+    // Respond: instruct frontend to navigate to verification UI
     res.status(201).json({
       success: true,
-      message: 'Registration successful. You can now log in.',
+      message: 'Registration successful! Please check your email for the 6-digit verification code.',
       data: {
         user: {
           id: user._id,
@@ -63,6 +76,17 @@ const registerStudent = async (req, res) => {
         }
       }
     });
+
+    // Send verification email asynchronously
+    sendEmail({
+      email: user.email,
+      subject: 'Verify your email - YabaTech BookStore',
+      html: emailTemplates.emailVerification(user.firstName, verificationCode)
+    }).then((info) => {
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('Email verification sent:', info?.messageId || 'ok');
+      }
+    }).catch((err) => console.error('Failed to send verification email:', err));
 
 
   } catch (error) {
@@ -309,11 +333,94 @@ const verifyToken = async (req, res) => {
   }
 };
 
+// @desc    Verify email using 6-digit code
+// @route   POST /api/auth/verify-email
+// @access  Public
+const verifyEmail = async (req, res) => {
+  try {
+    const { matricNo, verificationCode } = req.body;
+
+    if (!matricNo || !verificationCode) {
+      return res.status(400).json({ success: false, message: 'Matric number and verification code are required' });
+    }
+
+    const record = await Verification.findOne({
+      matricNo: matricNo.toUpperCase(),
+      code: verificationCode,
+      type: 'email-verification',
+      used: false,
+      expiresAt: { $gt: new Date() }
+    });
+
+    if (!record) {
+      return res.status(400).json({ success: false, message: 'Invalid or expired verification code' });
+    }
+
+    // Mark user as verified
+    const user = await User.findOne({ matricNo: matricNo.toUpperCase() });
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    user.isVerified = true;
+    await user.save();
+
+    // Mark verification as used
+    record.used = true;
+    await record.save();
+
+    res.json({ success: true, message: 'Email verified successfully' });
+  } catch (error) {
+    console.error('Verify email error:', error);
+    res.status(500).json({ success: false, message: error.message || 'Failed to verify email' });
+  }
+};
+
+// @desc    Resend verification code
+// @route   POST /api/auth/resend-verification
+// @access  Public
+const resendVerification = async (req, res) => {
+  try {
+    const { matricNo } = req.body;
+    if (!matricNo) return res.status(400).json({ success: false, message: 'Matric number is required' });
+
+    const user = await User.findOne({ matricNo: matricNo.toUpperCase() });
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    if (user.isVerified) return res.status(400).json({ success: false, message: 'User already verified' });
+
+    const verificationCode = generateVerificationCode();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    await Verification.create({
+      matricNo: user.matricNo,
+      code: verificationCode,
+      type: 'email-verification',
+      expiresAt
+    });
+
+    // Respond immediately
+    res.json({ success: true, message: 'Verification code resent to email' });
+
+    // Send email async
+    sendEmail({
+      email: user.email,
+      subject: 'Your verification code - YabaTech BookStore',
+      html: emailTemplates.emailVerification(user.firstName, verificationCode)
+    }).then((info) => {
+      if (process.env.NODE_ENV !== 'production') console.log('Resend verification email sent:', info?.messageId || 'ok');
+    }).catch((err) => console.error('Failed to resend verification email:', err));
+
+  } catch (error) {
+    console.error('Resend verification error:', error);
+    res.status(500).json({ success: false, message: error.message || 'Failed to resend verification code' });
+  }
+};
+
 module.exports = {
   registerStudent,
   login,
   adminLogin,
   forgotPassword,
   resetPassword,
+  verifyEmail,
+  resendVerification,
   verifyToken
 };

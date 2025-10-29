@@ -2,6 +2,8 @@ const Order = require('../models/Order');
 const Book = require('../models/Book');
 const { sendEmail, emailTemplates } = require('../utils/sendEmail');
 
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
+
 // @desc    Create new order
 // @route   POST /api/orders
 // @access  Private
@@ -48,6 +50,20 @@ const createOrder = async (req, res) => {
     })
       .then((info) => console.log('Async order confirmation email result:', info?.messageId || 'ok'))
       .catch((emailError) => console.error('Order confirmation email failed:', emailError));
+
+    // Notify admin about new order (non-blocking)
+    if (ADMIN_EMAIL) {
+      // send a simplified admin notification; include student info and items
+      sendEmail({
+        email: ADMIN_EMAIL,
+        subject: `New Order Placed - ${order.orderId}`,
+        html: emailTemplates.adminNewOrder('Admin', order, {
+          firstName: req.user.firstName,
+          lastName: req.user.lastName,
+          matricNo: req.user.matricNo
+        })
+      }).catch((e) => console.error('Admin notification email failed:', e));
+    }
 
     res.status(201).json({
       success: true,

@@ -162,7 +162,7 @@ const verifyPayment = async (req, res) => {
   try {
     const { reference } = req.params;
 
-    const order = await Order.findOne({ paymentReference: reference });
+  const order = await Order.findOne({ paymentReference: reference }).populate('user', 'firstName lastName email matricNo');
 
     if (!order) {
       return res.status(404).json({
@@ -188,6 +188,20 @@ const verifyPayment = async (req, res) => {
         order.paymentStatus = 'successful';
         order.status = 'confirmed'; // Move to confirmed status
         await order.save();
+
+        // Notify user about confirmed payment/order
+        try {
+          if (order.user && order.user.email) {
+            const { sendEmail, emailTemplates } = require('../utils/sendEmail');
+            sendEmail({
+              email: order.user.email,
+              subject: `Payment Confirmed - Order ${order.orderId}`,
+              html: emailTemplates.orderStatusUpdate(order.user.firstName || '', order, 'confirmed')
+            }).catch((e) => console.error('Payment confirmation email failed:', e));
+          }
+        } catch (e) {
+          console.error('Payment email notify error:', e);
+        }
 
         res.json({
           success: true,
@@ -217,6 +231,20 @@ const verifyPayment = async (req, res) => {
         order.status = 'confirmed';
         await order.save();
 
+        // Notify user
+        try {
+          if (order.user && order.user.email) {
+            const { sendEmail, emailTemplates } = require('../utils/sendEmail');
+            sendEmail({
+              email: order.user.email,
+              subject: `Payment Confirmed - Order ${order.orderId}`,
+              html: emailTemplates.orderStatusUpdate(order.user.firstName || '', order, 'confirmed')
+            }).catch((e) => console.error('Payment confirmation email failed:', e));
+          }
+        } catch (e) {
+          console.error('Payment email notify error:', e);
+        }
+
         res.json({
           success: true,
           message: 'Payment verified successfully',
@@ -242,6 +270,21 @@ const verifyPayment = async (req, res) => {
       order.paymentStatus = 'successful';
       order.status = 'confirmed';
       await order.save();
+
+      // Notify user (mock)
+      try {
+        const user = await Order.populate(order, { path: 'user', select: 'firstName lastName email matricNo' });
+        if (user.user && user.user.email) {
+          const { sendEmail, emailTemplates } = require('../utils/sendEmail');
+          sendEmail({
+            email: user.user.email,
+            subject: `Payment Confirmed - Order ${order.orderId}`,
+            html: emailTemplates.orderStatusUpdate(user.user.firstName || '', order, 'confirmed')
+          }).catch((e) => console.error('Payment confirmation email failed (mock):', e));
+        }
+      } catch (e) {
+        console.error('Mock payment notify error:', e);
+      }
 
       res.json({
         success: true,
