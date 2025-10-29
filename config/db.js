@@ -6,7 +6,6 @@ const connectDB = async () => {
       throw new Error('MONGODB_URI is not defined in environment variables');
     }
 
-    // Mongoose v6+ no longer requires these options; pass only the URI
     const conn = await mongoose.connect(process.env.MONGO_URI);
 
     console.log('MongoDB Connected');

@@ -39,7 +39,8 @@ if (missingEnvVars.length > 0) {
       process.env.FRONTEND_URL
     ].filter(Boolean); // Remove any undefined values
 
-    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV) {
+    // Allow any origin only in non-production environments
+    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));

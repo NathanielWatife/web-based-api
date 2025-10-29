@@ -133,7 +133,8 @@ const login = async (req, res) => {
           matricNo: user.matricNo,
           role: user.role,
           faculty: user.faculty,
-          department: user.department
+          department: user.department,
+          isVerified: user.isVerified
         }
       }
     });
