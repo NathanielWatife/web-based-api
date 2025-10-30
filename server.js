@@ -32,13 +32,16 @@ const corsOptions = {
     if (!origin) return callback(null, true);
     
     const allowedOrigins = [
-      process.env.FRONTEND_URL
+      process.env.FRONTEND_URL,
     ].filter(Boolean);
 
-    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
+    // Allow all subdomains of vercel.app for flexibility
+    if (allowedOrigins.some(allowed => origin === allowed) || 
+        origin.endsWith('.vercel.app') ||
+        process.env.NODE_ENV === 'development') {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      callback(new Error(`Not allowed by CORS: ${origin}`));
     }
   },
   credentials: true,
