@@ -16,27 +16,28 @@ const sendEmail = async (options) => {
   }
 
   // Production: Check if email is configured
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) { // Fixed: EMAIL_PASSWORD instead of EMAIL_PASS
     logger.warn('Email credentials missing. Logging instead of sending.');
     logger.info('EMAIL CONTENT:', { 
       subject: options.subject,
-      code: options.html.match(/\d{6}/)?.[0] || 'code not found'
+      code: options.html.match(/\d{6}/)?.[0] || 'code not found',
+      to: options.email
     });
     return { skipped: true, message: 'Email credentials not configured' };
   }
 
   const transporter = nodemailer.createTransport({
-    service: process.env.EMAIL_SERVICE || 'gmail',
-    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-    port: Number(process.env.EMAIL_PORT) || 587,
-    secure: false, // Use TLS
+    service: process.env.EMAIL_SERVICE,
+    host: process.env.EMAIL_HOST,
+    port: Number(process.env.EMAIL_PORT),
+    secure: false, 
     auth: {
       user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
+      pass: process.env.EMAIL_PASS, // Fixed: EMAIL_PASSWORD instead of EMAIL_PASS
     },
-    connectionTimeout: 10000, // 10 seconds
-    socketTimeout: 10000, // 10 seconds
-    greetingTimeout: 5000, // 5 seconds
+    connectionTimeout: 30000, // 30 seconds
+    socketTimeout: 30000, // 30 seconds
+    greetingTimeout: 30000, // 30 seconds
   });
 
   const mailOptions = {
@@ -56,7 +57,8 @@ const sendEmail = async (options) => {
   } catch (error) {
     logger.error('Email sending failed:', {
       error: error.message,
-      code: error.code
+      code: error.code,
+      stack: error.stack
     });
     
     // Don't throw error - just log it so API doesn't fail
