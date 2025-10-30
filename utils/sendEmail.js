@@ -16,7 +16,7 @@ const sendEmail = async (options) => {
   }
 
   // Production: Check if email is configured
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) { // Fixed: EMAIL_PASSWORD instead of EMAIL_PASS
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
     logger.warn('Email credentials missing. Logging instead of sending.');
     logger.info('EMAIL CONTENT:', { 
       subject: options.subject,
@@ -26,43 +26,67 @@ const sendEmail = async (options) => {
     return { skipped: true, message: 'Email credentials not configured' };
   }
 
+  // Derive secure flag (true for port 465 or explicit)
+  const derivedSecure = process.env.EMAIL_SECURE
+    ? String(process.env.EMAIL_SECURE).toLowerCase() === 'true'
+    : Number(process.env.EMAIL_PORT) === 465;
+
   const transporter = nodemailer.createTransport({
-    service: process.env.EMAIL_SERVICE,
-    host: process.env.EMAIL_HOST,
-    port: Number(process.env.EMAIL_PORT),
-    secure: false, 
+    service: process.env.EMAIL_SERVICE || undefined,
+    host: process.env.EMAIL_HOST || undefined,
+    port: Number(process.env.EMAIL_PORT) || undefined,
+    secure: derivedSecure,
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASSWORD,
     },
-    connectionTimeout: 30000, // 30 seconds
-    socketTimeout: 30000, // 30 seconds
-    greetingTimeout: 30000, // 30 seconds
+    connectionTimeout: Number(process.env.EMAIL_CONNECTION_TIMEOUT) || 30000,
+    socketTimeout: Number(process.env.EMAIL_SOCKET_TIMEOUT) || 30000,
+    greetingTimeout: Number(process.env.EMAIL_GREETING_TIMEOUT) || 30000,
+    tls: {
+      rejectUnauthorized: String(process.env.EMAIL_TLS_REJECT_UNAUTHORIZED || 'true').toLowerCase() === 'true',
+    },
   });
 
+  // Choose a safe "from" address. For Gmail, force using the authenticated user to avoid rejection.
+  const isGmail = (process.env.EMAIL_SERVICE || '').toLowerCase().includes('gmail')
+    || (process.env.EMAIL_HOST || '').toLowerCase().includes('gmail');
+  const fromAddress = isGmail
+    ? `YabaTech BookStore <${process.env.EMAIL_USER}>`
+    : (process.env.DEFAULT_FROM_EMAIL || `YabaTech BookStore <${process.env.EMAIL_USER}>`);
+
   const mailOptions = {
-    from: process.env.DEFAULT_FROM_EMAIL || `YabaTech BookStore <${process.env.EMAIL_USER}>`,
+    from: fromAddress,
     to: options.email,
     subject: options.subject,
     html: options.html,
   };
 
-  try {
-    const info = await transporter.sendMail(mailOptions);
-    logger.info('Email sent successfully', { 
-      messageId: info.messageId,
-      to: options.email.replace(/(.{2}).+(@.*)/, '$1***$2')
-    });
-    return info;
-  } catch (error) {
-    logger.error('Email sending failed:', {
-      error: error.message,
-      code: error.code,
-      stack: error.stack
-    });
-    
-    // Don't throw error - just log it so API doesn't fail
-    return { error: error.message, failed: true };
+  const maxAttempts = Number(process.env.EMAIL_MAX_ATTEMPTS) || 1;
+  const backoffMs = Number(process.env.EMAIL_RETRY_BACKOFF_MS) || 2000;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const info = await transporter.sendMail(mailOptions);
+      logger.info('Email sent successfully', { 
+        messageId: info.messageId,
+        to: options.email.replace(/(.{2}).+(@.*)/, '$1***$2'),
+        attempt
+      });
+      return info;
+    } catch (error) {
+      logger.error('Email sending failed', {
+        error: error.message,
+        code: error.code,
+        attempt,
+      });
+      if (attempt < maxAttempts) {
+        await new Promise((r) => setTimeout(r, backoffMs));
+      } else {
+        // Don't throw error - just log it so API doesn't fail
+        return { error: error.message, failed: true };
+      }
+    }
   }
 };
 

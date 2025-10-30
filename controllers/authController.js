@@ -63,6 +63,13 @@ const registerStudent = async (req, res) => {
       expiresAt
     });
 
+    // Send verification email BEFORE responding (important for serverless)
+    await sendEmail({
+      email: user.email,
+      subject: 'Verify your email - YabaTech BookStore',
+      html: emailTemplates.emailVerification(user.firstName, verificationCode)
+    });
+
     // Respond: instruct frontend to navigate to verification UI
     res.status(201).json({
       success: true,
@@ -77,17 +84,6 @@ const registerStudent = async (req, res) => {
         }
       }
     });
-
-    // Send verification email asynchronously
-    sendEmail({
-      email: user.email,
-      subject: 'Verify your email - YabaTech BookStore',
-      html: emailTemplates.emailVerification(user.firstName, verificationCode)
-    }).then((info) => {
-      if (process.env.NODE_ENV !== 'production') {
-        logger.debug('Email verification sent', { id: info?.messageId || 'ok' });
-      }
-    }).catch((err) => logger.error('Failed to send verification email: ' + (err?.message || err)));
 
 
   } catch (error) {
@@ -221,26 +217,18 @@ const forgotPassword = async (req, res) => {
       expiresAt
     });
 
+    // Send reset email BEFORE responding (important for serverless)
+    await sendEmail({
+      email: user.email,
+      subject: 'Password Reset - YabaTech BookStore',
+      html: emailTemplates.passwordReset(user.firstName, resetCode)
+    });
+
     // Respond immediately
     res.json({
       success: true,
       message: 'Password reset instructions sent to your email'
     });
-
-    // Send reset email asynchronously
-    sendEmail({
-      email: user.email,
-      subject: 'Password Reset - YabaTech BookStore',
-      html: emailTemplates.passwordReset(user.firstName, resetCode)
-    })
-      .then((info) => {
-        if (process.env.NODE_ENV !== 'production') {
-          logger.debug('Password reset email sent', { id: info?.messageId || 'ok' });
-        }
-      })
-      .catch((emailError) => {
-        logger.error('Email sending failed: ' + (emailError?.message || emailError));
-      });
 
   } catch (error) {
     logger.error('Forgot password error: ' + (error?.message || error));
@@ -417,17 +405,15 @@ const resendVerification = async (req, res) => {
       expiresAt
     });
 
-    // Respond immediately
-    res.json({ success: true, message: 'Verification code resent to email' });
-
-    // Send email async
-    sendEmail({
+    // Send email BEFORE responding (important for serverless)
+    await sendEmail({
       email: user.email,
       subject: 'Your verification code - YabaTech BookStore',
       html: emailTemplates.emailVerification(user.firstName, verificationCode)
-    }).then((info) => {
-      if (process.env.NODE_ENV !== 'production') logger.debug('Resend verification email sent', { id: info?.messageId || 'ok' });
-    }).catch((err) => logger.error('Failed to resend verification email: ' + (err?.message || err)));
+    });
+
+    // Respond immediately
+    res.json({ success: true, message: 'Verification code resent to email' });
 
   } catch (error) {
     logger.error('Resend verification error: ' + (error?.message || error));
