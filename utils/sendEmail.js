@@ -16,7 +16,7 @@ const sendEmail = async (options) => {
   }
 
   // Production: Check if email is configured
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) { // Fixed: EMAIL_PASSWORD instead of EMAIL_PASS
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) { // Fixed: EMAIL_PASSWORD instead of EMAIL_PASS
     logger.warn('Email credentials missing. Logging instead of sending.');
     logger.info('EMAIL CONTENT:', { 
       subject: options.subject,
@@ -33,7 +33,7 @@ const sendEmail = async (options) => {
     secure: false, 
     auth: {
       user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS, // Fixed: EMAIL_PASSWORD instead of EMAIL_PASS
+      pass: process.env.EMAIL_PASSWORD,
     },
     connectionTimeout: 30000, // 30 seconds
     socketTimeout: 30000, // 30 seconds
