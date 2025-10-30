@@ -8,15 +8,17 @@ const connectDB = async () => {
 
     const conn = await mongoose.connect(process.env.MONGO_URI);
 
-    console.log('MongoDB Connected');
+    const { logger } = require('../utils/logger');
+    logger.info('MongoDB connected');
     return conn;
   } catch (error) {
-    console.error('Database connection error:', error.message);
+    const { logger } = require('../utils/logger');
+    logger.error('Database connection error: ' + error.message);
     
     if (error.name === 'MongoParseError') {
-      console.error('Please check your MONGO_URI format');
+      logger.error('Please check your MONGO_URI format');
     } else if (error.name === 'MongoNetworkError') {
-      console.error('Please make sure MongoDB is running');
+      logger.error('Please make sure MongoDB is running');
     }
     
     process.exit(1);

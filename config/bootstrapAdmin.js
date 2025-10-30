@@ -7,13 +7,15 @@ module.exports = async function bootstrapAdmin() {
     const email = process.env.ADMIN_EMAIL;
     const password = process.env.ADMIN_PASSWORD;
     if (!email || !password) {
-      console.log('Admin bootstrap skipped: ADMIN_EMAIL or ADMIN_PASSWORD not set');
+      const { logger } = require('../utils/logger');
+      logger.info('Admin bootstrap skipped: ADMIN_EMAIL or ADMIN_PASSWORD not set');
       return;
     }
 
     const existing = await User.findOne({ email, role: 'admin' });
     if (existing) {
-      console.log(`Admin account exists: ${email}`);
+      const { logger } = require('../utils/logger');
+      logger.info(`Admin account exists: ${email}`);
       return;
     }
 
@@ -40,8 +42,10 @@ module.exports = async function bootstrapAdmin() {
       admissionYear: `20${yy}`,
     });
 
-    console.log(`Admin account created: ${email} `);
+    const { logger } = require('../utils/logger');
+    logger.info(`Admin account created: ${email}`);
   } catch (err) {
-    console.error('Admin bootstrap failed:', err?.message || err);
+    const { logger } = require('../utils/logger');
+    logger.error('Admin bootstrap failed: ' + (err?.message || err));
   }
 };

@@ -1,14 +1,15 @@
 const nodemailer = require('nodemailer');
+const { logger, redact } = require('./logger');
 
 // Generic email sender function (Gmail SMTP via Nodemailer)
 const sendEmail = async (options) => {
-  console.log(`📧 Attempting to send email to: ${options.email}`);
+  logger.info(`Email send attempt`, { to: options.email ? options.email.replace(/(.{2}).+(@.*)/, '$1***$2') : undefined });
 
   // Quick guard: if essential SMTP config is missing, skip sending and
   // return early. This prevents long delays when running locally without
   // SMTP configured (development) and avoids blocking API responses.
   if (!process.env.EMAIL_HOST && !process.env.EMAIL_SERVICE) {
-    console.warn('Email configuration not provided (EMAIL_HOST or EMAIL_SERVICE). Skipping sendEmail.');
+  logger.warn('Email configuration not provided (EMAIL_HOST or EMAIL_SERVICE). Skipping sendEmail.');
     return { skipped: true, message: 'Email skipped: not configured' };
   }
 
@@ -58,11 +59,11 @@ const sendEmail = async (options) => {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const info = await transporter.sendMail(mailOptions);
-      console.log('✅ Email sent successfully:', info?.messageId || 'ok');
+      logger.info('Email sent successfully', { id: info?.messageId || 'ok' });
       return info;
     } catch (error) {
       lastError = error;
-      console.error(`❌ Email attempt ${attempt} failed:`, error?.message || error);
+      logger.error(`Email attempt ${attempt} failed: ${error?.message || error}`);
       if (attempt < maxAttempts) {
         await new Promise((res) => setTimeout(res, backoffBase * attempt));
       }

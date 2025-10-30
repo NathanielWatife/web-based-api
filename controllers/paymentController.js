@@ -1,5 +1,6 @@
 const Order = require('../models/Order');
 const paystack = require('paystack-node');
+const { logger } = require('../utils/logger');
 
 // Initialize Paystack client
 const paystackClient = process.env.PAYSTACK_SECRET_KEY 
@@ -13,7 +14,7 @@ if (process.env.FLUTTERWAVE_SECRET_KEY) {
     const Flutterwave = require('flutterwave-node-v3');
     flw = new Flutterwave(process.env.FLUTTERWAVE_SECRET_KEY);
   } catch (error) {
-    console.warn('Flutterwave SDK not available:', error.message);
+    logger.warn('Flutterwave SDK not available: ' + error.message);
   }
 }
 
@@ -147,7 +148,7 @@ const initializePayment = async (req, res) => {
       }
     }
   } catch (error) {
-    console.error('Initialize payment error:', error);
+    logger.error('Initialize payment error: ' + (error?.message || error));
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to initialize payment'
@@ -197,10 +198,10 @@ const verifyPayment = async (req, res) => {
               email: order.user.email,
               subject: `Payment Confirmed - Order ${order.orderId}`,
               html: emailTemplates.orderStatusUpdate(order.user.firstName || '', order, 'confirmed')
-            }).catch((e) => console.error('Payment confirmation email failed:', e));
+            }).catch((e) => logger.error('Payment confirmation email failed: ' + (e?.message || e)));
           }
         } catch (e) {
-          console.error('Payment email notify error:', e);
+          logger.error('Payment email notify error: ' + (e?.message || e));
         }
 
         res.json({
@@ -239,10 +240,10 @@ const verifyPayment = async (req, res) => {
               email: order.user.email,
               subject: `Payment Confirmed - Order ${order.orderId}`,
               html: emailTemplates.orderStatusUpdate(order.user.firstName || '', order, 'confirmed')
-            }).catch((e) => console.error('Payment confirmation email failed:', e));
+            }).catch((e) => logger.error('Payment confirmation email failed: ' + (e?.message || e)));
           }
         } catch (e) {
-          console.error('Payment email notify error:', e);
+          logger.error('Payment email notify error: ' + (e?.message || e));
         }
 
         res.json({
@@ -280,10 +281,10 @@ const verifyPayment = async (req, res) => {
             email: user.user.email,
             subject: `Payment Confirmed - Order ${order.orderId}`,
             html: emailTemplates.orderStatusUpdate(user.user.firstName || '', order, 'confirmed')
-          }).catch((e) => console.error('Payment confirmation email failed (mock):', e));
+          }).catch((e) => logger.error('Payment confirmation email failed (mock): ' + (e?.message || e)));
         }
       } catch (e) {
-        console.error('Mock payment notify error:', e);
+        logger.error('Mock payment notify error: ' + (e?.message || e));
       }
 
       res.json({
@@ -302,7 +303,7 @@ const verifyPayment = async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('Verify payment error:', error);
+    logger.error('Verify payment error: ' + (error?.message || error));
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to verify payment'

@@ -3,8 +3,9 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const connectDB = require('./config/db');
-const bootstrapAdmin = require('./config/bootstrapAdmin');
 const errorHandler = require('./middleware/errorMiddleware');
+const morgan = require('morgan');
+const { logger, startup } = require('./utils/logger');
 
 // Load env vars
 dotenv.config();
@@ -14,157 +15,144 @@ const requiredEnvVars = ['MONGO_URI', 'JWT_SECRET'];
 const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
 
 if (missingEnvVars.length > 0) {
-  console.error('Missing required environment variables:', missingEnvVars.join(', '));
-  console.error('Please check your .env file');
+  logger.error('Missing required environment variables: ' + missingEnvVars.join(', '));
+  logger.error('Please check your .env file');
   process.exit(1);
 }
 
-// Start application: connect to DB, then configure and start the server
-(async function start() {
-  try {
-    // Connect to database (await to ensure DB is ready before bootstrapping)
-    await connectDB();
+// Connect to database
+connectDB();
 
-    const app = express();
+const app = express();
 
-    const path = require('path');
+// Enhanced CORS configuration
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = [
+      process.env.FRONTEND_URL
+    ].filter(Boolean);
 
-    // Simple CORS configuration using only environment variables
-    // FRONTEND_URLS: comma-separated list of allowed origins
-    // FRONTEND_URL: single allowed origin
-    const allowedOrigins = (process.env.FRONTEND_URL)
-      .split(',')
-      .map(s => s.trim())
-      .filter(Boolean);
+    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Requested-With',
+    'Accept',
+    'Origin',
+    'Access-Control-Request-Method',
+    'Access-Control-Request-Headers'
+  ],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204
+};
 
-    console.log('CORS allowed origins (env):', allowedOrigins);
+// Apply CORS middleware
+app.use(cors(corsOptions));
 
-    const corsOptions = {
-      origin: function (origin, callback) {
-        // Allow requests with no origin (like mobile apps or curl)
-        if (!origin) return callback(null, true);
-        if (allowedOrigins.includes(origin)) return callback(null, true);
-        return callback(new Error('Not allowed by CORS'));
-      },
-      credentials: true,
-      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-      allowedHeaders: [
-        'Content-Type',
-        'Authorization',
-        'X-Requested-With',
-        'Accept',
-        'Origin',
-        'Access-Control-Request-Method',
-        'Access-Control-Request-Headers'
-      ],
-      exposedHeaders: ['Content-Range', 'X-Content-Range'],
-      preflightContinue: false,
-      optionsSuccessStatus: 204
-    };
+// Handle preflight requests explicitly (use RegExp to avoid path-to-regexp '*' issue)
+app.options(/.*/, cors(corsOptions));
 
-    // Apply CORS middleware
-    app.use(cors(corsOptions));
+// Middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-    // Handle preflight requests explicitly
-    app.options(/.*/, cors(corsOptions));
+// HTTP logging (sanitized): avoid logging query strings or sensitive headers
+morgan.token('urlPath', (req) => (req.originalUrl || req.url || '').split('?')[0]);
+app.use(
+  morgan(':method :urlPath :status :res[content-length] - :response-time ms', {
+    stream: logger.stream,
+    skip: () => process.env.NODE_ENV === 'test',
+  })
+);
 
-    // Middleware
-    app.use(express.json());
-    app.use(express.urlencoded({ extended: true }));
+// Routes
+app.use('/api/auth', require('./routes/authRoutes'));
+app.use('/api/books', require('./routes/bookRoutes'));
+app.use('/api/orders', require('./routes/orderRoutes'));
+app.use('/api/payments', require('./routes/paymentRoutes'));
+app.use('/api/admin', require('./routes/adminRoutes'));
 
-    // Serve uploaded files (development fallback for image uploads)
-    app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Home route
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'YabaTech BookStore API is running!',
+    version: '1.0.0',
+    environment: process.env.NODE_ENV,
+    timestamp: new Date().toISOString()
+  });
+});
 
-    // Logging middleware
-    app.use((req, res, next) => {
-      console.log(`${req.method} ${req.path} - ${new Date().toISOString()}`);
-      console.log('Origin:', req.headers.origin);
-      next();
-    });
+// Health check route
+app.get('/health', (req, res) => {
+  const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
+  
+  res.status(200).json({
+    status: 'OK',
+    environment: process.env.NODE_ENV,
+    database: dbStatus,
+    timestamp: new Date().toISOString(),
+    cors: {
+      allowedOrigins: [process.env.FRONTEND_URL].filter(Boolean)
+    }
+  });
+});
 
-    // Routes
-    app.use('/api/auth', require('./routes/authRoutes'));
-    app.use('/api/books', require('./routes/bookRoutes'));
-    app.use('/api/orders', require('./routes/orderRoutes'));
-    app.use('/api/payments', require('./routes/paymentRoutes'));
-    app.use('/api/admin', require('./routes/adminRoutes'));
+// Error handling middleware
+app.use(errorHandler);
 
-    // Home route
-    app.get('/', (req, res) => {
-      res.json({ 
-        message: 'YabaTech BookStore API is running!',
-        version: '1.0.0',
-        environment: process.env.NODE_ENV,
-        timestamp: new Date().toISOString()
-      });
-    });
+// Handle undefined routes
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: `Route ${req.originalUrl} not found`
+  });
+});
 
-    // Health check route
-    app.get('/health', (req, res) => {
-      const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
-      
-      res.status(200).json({
-        status: 'OK',
-        environment: process.env.NODE_ENV,
-        database: dbStatus,
-        timestamp: new Date().toISOString(),
-        cors: {
-          allowedOrigins
-        }
-      });
-    });
+const PORT = process.env.PORT || 5000;
 
-    // Error handling middleware
-    app.use(errorHandler);
-
-    // Handle undefined routes
-    app.use((req, res) => {
-      res.status(404).json({
-        success: false,
-        message: `Route ${req.originalUrl} not found`
-      });
-    });
-
-    const PORT = process.env.PORT;
-
-    const server = app.listen(PORT, async () => {
-      console.log(`🚀 Server running in ${process.env.NODE_ENV === 'production' ? 'production' : 'development'} mode on port ${PORT}`);
-  console.log(`🌐 CORS enabled for: ${allowedOrigins.join(', ') || '(none configured)'}`);
-      
-      // Check payment gateway configuration
-      if (!process.env.PAYSTACK_SECRET_KEY && !process.env.FLUTTERWAVE_SECRET_KEY) {
-        console.log('⚠️  Payment gateways not configured - using mock payments for development');
-      }
-
-      // Bootstrap admin account if missing
-      await bootstrapAdmin();
-    });
-
-    // Handle graceful shutdown
-    process.on('SIGTERM', () => {
-      console.log('SIGTERM received, shutting down gracefully');
-      server.close(() => {
-        console.log('Process terminated');
-        process.exit(0);
-      });
-    });
-
-    // Handle unhandled promise rejections
-    process.on('unhandledRejection', (err, promise) => {
-      console.log('Unhandled Rejection at:', promise, 'reason:', err);
-      // Close server & exit process
-      server.close(() => {
-        process.exit(1);
-      });
-    });
-
-    // Handle uncaught exceptions
-    process.on('uncaughtException', (err) => {
-      console.log('Uncaught Exception thrown:', err);
-      process.exit(1);
-    });
-  } catch (err) {
-    console.error('Failed to start application:', err);
-    process.exit(1);
+const server = app.listen(PORT, () => {
+  startup(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+  startup(`API: http://localhost:${PORT}`);
+  startup(`Health check: http://localhost:${PORT}/health`);
+  startup('CORS enabled');
+  
+  // Check payment gateway configuration
+  if (!process.env.PAYSTACK_SECRET_KEY && !process.env.FLUTTERWAVE_SECRET_KEY) {
+    logger.warn('Payment gateways not configured - using mock payments for development');
   }
-})();
+});
+
+// Handle graceful shutdown
+process.on('SIGTERM', () => {
+  logger.warn('SIGTERM received, shutting down gracefully');
+  server.close(() => {
+    logger.info('Process terminated');
+    process.exit(0);
+  });
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (err, promise) => {
+  logger.error('Unhandled Rejection', { reason: err?.message || err, promise: typeof promise });
+  // Close server & exit process
+  server.close(() => {
+    process.exit(1);
+  });
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (err) => {
+  logger.error('Uncaught Exception thrown', { error: err?.message, stack: err?.stack });
+  process.exit(1);
+});

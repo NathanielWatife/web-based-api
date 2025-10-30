@@ -3,6 +3,7 @@ const Verification = require('../models/Verification');
 const generateToken = require('../utils/generateToken');
 const { sendEmail, emailTemplates } = require('../utils/sendEmail');
 const generateVerificationCode = require('../utils/generateVerificationCode');
+const { logger } = require('../utils/logger');
 
 // Verification types used in this controller: 'email-verification', 'password-reset'
 
@@ -84,13 +85,13 @@ const registerStudent = async (req, res) => {
       html: emailTemplates.emailVerification(user.firstName, verificationCode)
     }).then((info) => {
       if (process.env.NODE_ENV !== 'production') {
-        console.log('Email verification sent:', info?.messageId || 'ok');
+        logger.debug('Email verification sent', { id: info?.messageId || 'ok' });
       }
-    }).catch((err) => console.error('Failed to send verification email:', err));
+    }).catch((err) => logger.error('Failed to send verification email: ' + (err?.message || err)));
 
 
   } catch (error) {
-    console.error('Registration error:', error);
+    logger.error('Registration error: ' + (error?.message || error));
     res.status(500).json({
       success: false,
       message: error.message || 'Registration failed'
@@ -140,7 +141,7 @@ const login = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Login error:', error);
+    logger.error('Login error: ' + (error?.message || error));
     res.status(500).json({
       success: false,
       message: error.message || 'Login failed'
@@ -184,7 +185,7 @@ const adminLogin = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Admin login error:', error);
+    logger.error('Admin login error: ' + (error?.message || error));
     res.status(500).json({
       success: false,
       message: error.message || 'Admin login failed'
@@ -234,15 +235,15 @@ const forgotPassword = async (req, res) => {
     })
       .then((info) => {
         if (process.env.NODE_ENV !== 'production') {
-          console.log('Password reset email sent:', info?.messageId || 'ok');
+          logger.debug('Password reset email sent', { id: info?.messageId || 'ok' });
         }
       })
       .catch((emailError) => {
-        console.error('Email sending failed:', emailError?.message || emailError);
+        logger.error('Email sending failed: ' + (emailError?.message || emailError));
       });
 
   } catch (error) {
-    console.error('Forgot password error:', error);
+    logger.error('Forgot password error: ' + (error?.message || error));
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to process password reset request'
@@ -295,7 +296,7 @@ const resetPassword = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Reset password error:', error);
+    logger.error('Reset password error: ' + (error?.message || error));
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to reset password'
@@ -389,7 +390,7 @@ const verifyEmail = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Verify email error:', error);
+    logger.error('Verify email error: ' + (error?.message || error));
     res.status(500).json({ success: false, message: error.message || 'Failed to verify email' });
   }
 };
@@ -425,11 +426,11 @@ const resendVerification = async (req, res) => {
       subject: 'Your verification code - YabaTech BookStore',
       html: emailTemplates.emailVerification(user.firstName, verificationCode)
     }).then((info) => {
-      if (process.env.NODE_ENV !== 'production') console.log('Resend verification email sent:', info?.messageId || 'ok');
-    }).catch((err) => console.error('Failed to resend verification email:', err));
+      if (process.env.NODE_ENV !== 'production') logger.debug('Resend verification email sent', { id: info?.messageId || 'ok' });
+    }).catch((err) => logger.error('Failed to resend verification email: ' + (err?.message || err)));
 
   } catch (error) {
-    console.error('Resend verification error:', error);
+    logger.error('Resend verification error: ' + (error?.message || error));
     res.status(500).json({ success: false, message: error.message || 'Failed to resend verification code' });
   }
 };

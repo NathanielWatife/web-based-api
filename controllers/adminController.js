@@ -2,6 +2,7 @@ const User = require('../models/User');
 const Book = require('../models/Book');
 const Order = require('../models/Order');
 const { sendEmail, emailTemplates } = require('../utils/sendEmail');
+const { logger } = require('../utils/logger');
 
 // @desc    Get dashboard stats
 // @route   GET /api/admin/dashboard
@@ -44,7 +45,7 @@ const getDashboardStats = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Get dashboard stats error:', error);
+    logger.error('Get dashboard stats error: ' + (error?.message || error));
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to fetch dashboard stats'
@@ -82,7 +83,7 @@ const getAllOrders = async (req, res) => {
       data: orders
     });
   } catch (error) {
-    console.error('Get all orders error:', error);
+    logger.error('Get all orders error: ' + (error?.message || error));
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to fetch orders'
@@ -117,10 +118,10 @@ const updateOrderStatus = async (req, res) => {
           email: order.user.email,
           subject: `Order ${order.orderId} - Status Updated`,
           html: emailTemplates.orderStatusUpdate(order.user.firstName || '', order, status)
-        }).catch((e) => console.error('Failed to send order status email:', e));
+        }).catch((e) => logger.error('Failed to send order status email: ' + (e?.message || e)));
       }
     } catch (e) {
-      console.error('Order status notification error:', e);
+      logger.error('Order status notification error: ' + (e?.message || e));
     }
 
     res.json({
@@ -129,7 +130,7 @@ const updateOrderStatus = async (req, res) => {
       data: order
     });
   } catch (error) {
-    console.error('Update order status error:', error);
+    logger.error('Update order status error: ' + (error?.message || error));
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to update order status'
@@ -169,7 +170,7 @@ const getAllUsers = async (req, res) => {
       data: users
     });
   } catch (error) {
-    console.error('Get all users error:', error);
+    logger.error('Get all users error: ' + (error?.message || error));
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to fetch users'

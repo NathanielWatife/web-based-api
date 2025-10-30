@@ -2,6 +2,7 @@ const multer = require('multer');
 const path = require('path');
 const cloudinary = require('../config/cloudinary');
 const { formatResponse } = require('../utils/helpers');
+const { logger } = require('../utils/logger');
 
 // Configure multer for memory storage
 const storage = multer.memoryStorage();
@@ -62,7 +63,7 @@ const uploadSingleImage = (fieldName) => {
           req.file.cloudinaryResult = result;
           next();
         } catch (error) {
-          console.error('Cloudinary upload error:', error);
+          logger.error('Cloudinary upload error: ' + (error?.message || error));
           return res.status(500).json(
             formatResponse(false, 'Error uploading image')
           );

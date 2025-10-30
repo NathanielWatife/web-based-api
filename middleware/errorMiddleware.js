@@ -2,8 +2,13 @@ const errorHandler = (err, req, res, next) => {
   let error = { ...err };
   error.message = err.message;
 
-  // Log to console for dev
-  console.log(err);
+  // Log error centrally (without exposing sensitive request data)
+  try {
+    const { logger } = require('../utils/logger');
+    logger.error(err);
+  } catch (_) {
+    // fallback no-op if logger not available
+  }
 
   // Mongoose bad ObjectId
   if (err.name === 'CastError') {

@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const User = require('./models/User');
 const Book = require('./models/Book');
+const { logger } = require('./utils/logger');
 
 dotenv.config();
 
@@ -70,13 +71,13 @@ const sampleBooks = [
 
 const seedDatabase = async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URI);
-    console.log('Connected to database');
+  await mongoose.connect(process.env.MONGO_URI);
+  logger.info('Connected to database');
 
     // Clear existing data
-    await User.deleteMany({});
-    await Book.deleteMany({});
-    console.log('Cleared existing data');
+  await User.deleteMany({});
+  await Book.deleteMany({});
+  logger.info('Cleared existing data');
 
     // Create admin user
     const adminUser = await User.create({
@@ -92,7 +93,7 @@ const seedDatabase = async () => {
       programme: 'Higher National Diploma',
       admissionYear: '2023'
     });
-    console.log('Admin user created');
+  logger.info('Admin user created');
 
     // Create sample student
     const studentUser = await User.create({
@@ -109,16 +110,16 @@ const seedDatabase = async () => {
       admissionYear: '2023',
       phoneNumber: '+2348012345678'
     });
-    console.log('Sample student created');
+  logger.info('Sample student created');
 
     // Create sample books
-    await Book.create(sampleBooks);
-    console.log('Sample books created');
+  await Book.create(sampleBooks);
+  logger.info('Sample books created');
 
-    console.log('Database seeded successfully');
+    logger.info('Database seeded successfully');
     process.exit(0);
   } catch (error) {
-    console.error('Seeding error:', error);
+    logger.error('Seeding error: ' + (error?.message || error));
     process.exit(1);
   }
 };

@@ -3,6 +3,7 @@ const path = require('path');
 const Book = require('../models/Book');
 const APIFeatures = require('../utils/apiFeatures');
 const cloudinary = require('../config/cloudinary');
+const { logger } = require('../utils/logger');
 
 // Determine if Cloudinary is configured via env vars
 const hasCloudinary = Boolean(
@@ -85,7 +86,7 @@ const getBooks = async (req, res) => {
       data: books
     });
   } catch (error) {
-    console.error('Get books error:', error);
+    logger.error('Get books error: ' + (error?.message || error));
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to fetch books'
@@ -112,7 +113,7 @@ const getBook = async (req, res) => {
       data: book
     });
   } catch (error) {
-    console.error('Get book error:', error);
+    logger.error('Get book error: ' + (error?.message || error));
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to fetch book'
@@ -132,7 +133,7 @@ const getCategories = async (req, res) => {
       data: categories
     });
   } catch (error) {
-    console.error('Get categories error:', error);
+    logger.error('Get categories error: ' + (error?.message || error));
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to fetch categories'
@@ -166,7 +167,7 @@ const createBook = async (req, res) => {
       data: book
     });
   } catch (error) {
-    console.error('Create book error:', error);
+    logger.error('Create book error: ' + (error?.message || error));
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to create book'
@@ -211,7 +212,7 @@ const updateBook = async (req, res) => {
       data: book
     });
   } catch (error) {
-    console.error('Update book error:', error);
+    logger.error('Update book error: ' + (error?.message || error));
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to update book'
@@ -242,7 +243,7 @@ const deleteBook = async (req, res) => {
       message: 'Book deleted successfully'
     });
   } catch (error) {
-    console.error('Delete book error:', error);
+    logger.error('Delete book error: ' + (error?.message || error));
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to delete book'

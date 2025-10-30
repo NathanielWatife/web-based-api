@@ -1,6 +1,7 @@
 const Order = require('../models/Order');
 const Book = require('../models/Book');
 const { sendEmail, emailTemplates } = require('../utils/sendEmail');
+const { logger } = require('../utils/logger');
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
 
@@ -48,8 +49,8 @@ const createOrder = async (req, res) => {
       subject: 'Order Confirmed - YabaTech BookStore',
       html: emailTemplates.orderConfirmation(req.user.firstName, order)
     })
-      .then((info) => console.log('Async order confirmation email result:', info?.messageId || 'ok'))
-      .catch((emailError) => console.error('Order confirmation email failed:', emailError));
+      .then((info) => logger.debug('Async order confirmation email result', { id: info?.messageId || 'ok' }))
+      .catch((emailError) => logger.error('Order confirmation email failed: ' + (emailError?.message || emailError)));
 
     // Notify admin about new order (non-blocking)
     if (ADMIN_EMAIL) {
@@ -62,7 +63,7 @@ const createOrder = async (req, res) => {
           lastName: req.user.lastName,
           matricNo: req.user.matricNo
         })
-      }).catch((e) => console.error('Admin notification email failed:', e));
+  }).catch((e) => logger.error('Admin notification email failed: ' + (e?.message || e)));
     }
 
     res.status(201).json({
@@ -71,7 +72,7 @@ const createOrder = async (req, res) => {
       data: order
     });
   } catch (error) {
-    console.error('Create order error:', error);
+    logger.error('Create order error: ' + (error?.message || error));
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to create order'
@@ -94,7 +95,7 @@ const getMyOrders = async (req, res) => {
       data: orders
     });
   } catch (error) {
-    console.error('Get my orders error:', error);
+    logger.error('Get my orders error: ' + (error?.message || error));
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to fetch orders'
@@ -131,7 +132,7 @@ const getOrder = async (req, res) => {
       data: order
     });
   } catch (error) {
-    console.error('Get order error:', error);
+    logger.error('Get order error: ' + (error?.message || error));
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to fetch order'
@@ -188,7 +189,7 @@ const cancelOrder = async (req, res) => {
       data: order
     });
   } catch (error) {
-    console.error('Cancel order error:', error);
+    logger.error('Cancel order error: ' + (error?.message || error));
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to cancel order'
