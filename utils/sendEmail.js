@@ -1,76 +1,67 @@
 const nodemailer = require('nodemailer');
 const { logger, redact } = require('./logger');
 
-// Generic email sender function (Gmail SMTP via Nodemailer)
 const sendEmail = async (options) => {
-  logger.info(`Email send attempt`, { to: options.email ? options.email.replace(/(.{2}).+(@.*)/, '$1***$2') : undefined });
-
-  // Quick guard: if essential SMTP config is missing, skip sending and
-  // return early. This prevents long delays when running locally without
-  // SMTP configured (development) and avoids blocking API responses.
-  if (!process.env.EMAIL_HOST && !process.env.EMAIL_SERVICE) {
-  logger.warn('Email configuration not provided (EMAIL_HOST or EMAIL_SERVICE). Skipping sendEmail.');
-    return { skipped: true, message: 'Email skipped: not configured' };
-  }
-
-  const service = process.env.EMAIL_SERVICE;
-  const host = process.env.EMAIL_HOST;
-  const port = Number(process.env.EMAIL_PORT);
-  const secure = port === 465; // 465 = SSL/TLS
-
-  const transporter = nodemailer.createTransport({
-    host,
-    port,
-    secure,
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS, // Gmail App Password required
-    },
-    pool: true,
-    keepAlive: true,
-    maxConnections: Number(process.env.EMAIL_MAX_CONNECTIONS || 3),
-    maxMessages: Number(process.env.EMAIL_MAX_MESSAGES || 200),
-    connectionTimeout: Number(process.env.EMAIL_CONNECTION_TIMEOUT || 30000),
-    greetingTimeout: Number(process.env.EMAIL_GREETING_TIMEOUT || 20000),
-    socketTimeout: Number(process.env.EMAIL_SOCKET_TIMEOUT || 45000),
-    tls: {
-      minVersion: 'TLSv1.2',
-      rejectUnauthorized: String(process.env.EMAIL_TLS_REJECT_UNAUTHORIZED || 'true') === 'true',
-      servername: host,
-    },
-    logger: String(process.env.EMAIL_DEBUG || 'false') === 'true',
-    debug: String(process.env.EMAIL_DEBUG || 'false') === 'true',
-    name: process.env.EMAIL_EHLO_NAME || undefined,
+  logger.info(`Email send attempt`, { 
+    to: options.email ? options.email.replace(/(.{2}).+(@.*)/, '$1***$2') : undefined 
   });
 
-  const from = process.env.DEFAULT_FROM_EMAIL || `YabaTech BookStore <${process.env.EMAIL_USER}>`;
+  // Development fallback - log code instead of sending email
+  if (process.env.NODE_ENV === 'development' && !process.env.EMAIL_USER) {
+    logger.info('DEVELOPMENT: Email would be sent with code', { 
+      code: options.html.match(/\d{6}/)?.[0] || 'code not found',
+      subject: options.subject
+    });
+    return { skipped: true, message: 'Email logged instead of sent (development)' };
+  }
+
+  // Production: Check if email is configured
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    logger.warn('Email credentials missing. Logging instead of sending.');
+    logger.info('EMAIL CONTENT:', { 
+      subject: options.subject,
+      code: options.html.match(/\d{6}/)?.[0] || 'code not found'
+    });
+    return { skipped: true, message: 'Email credentials not configured' };
+  }
+
+  const transporter = nodemailer.createTransport({
+    service: process.env.EMAIL_SERVICE || 'gmail',
+    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+    port: Number(process.env.EMAIL_PORT) || 587,
+    secure: false, // Use TLS
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+    connectionTimeout: 10000, // 10 seconds
+    socketTimeout: 10000, // 10 seconds
+    greetingTimeout: 5000, // 5 seconds
+  });
 
   const mailOptions = {
-    from,
+    from: process.env.DEFAULT_FROM_EMAIL || `YabaTech BookStore <${process.env.EMAIL_USER}>`,
     to: options.email,
     subject: options.subject,
     html: options.html,
   };
 
-  const maxAttempts = Number(process.env.EMAIL_MAX_ATTEMPTS || 3);
-  const backoffBase = Number(process.env.EMAIL_RETRY_BACKOFF_MS || 2000);
-
-  let lastError;
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      const info = await transporter.sendMail(mailOptions);
-      logger.info('Email sent successfully', { id: info?.messageId || 'ok' });
-      return info;
-    } catch (error) {
-      lastError = error;
-      logger.error(`Email attempt ${attempt} failed: ${error?.message || error}`);
-      if (attempt < maxAttempts) {
-        await new Promise((res) => setTimeout(res, backoffBase * attempt));
-      }
-    }
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    logger.info('Email sent successfully', { 
+      messageId: info.messageId,
+      to: options.email.replace(/(.{2}).+(@.*)/, '$1***$2')
+    });
+    return info;
+  } catch (error) {
+    logger.error('Email sending failed:', {
+      error: error.message,
+      code: error.code
+    });
+    
+    // Don't throw error - just log it so API doesn't fail
+    return { error: error.message, failed: true };
   }
-
-  throw lastError;
 };
 
 // Email templates
