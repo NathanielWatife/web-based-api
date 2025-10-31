@@ -21,10 +21,12 @@ if (missingEnvVars.length > 0) {
   process.exit(1);
 }
 
-// Connect to database
-connectDB();
-// Ensure admin account exists
-bootstrapAdmin();
+// Connect to database and ensure admin account exists BEFORE starting server
+// Avoid serverless cold start issues by awaiting initialization
+const initialize = async () => {
+  await connectDB();
+  await bootstrapAdmin();
+};
 
 const app = express();
 
@@ -127,17 +129,25 @@ app.use((req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
-const server = app.listen(PORT, () => {
-  startup(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
-  startup(`API: http://localhost:${PORT}`);
-  startup(`Health check: http://localhost:${PORT}/health`);
-  startup('CORS enabled');
-  
-  // Check payment gateway configuration
-  if (!process.env.PAYSTACK_SECRET_KEY && !process.env.FLUTTERWAVE_SECRET_KEY) {
-    logger.warn('Payment gateways not configured - using mock payments for development');
-  }
-});
+let server;
+initialize()
+  .then(() => {
+    server = app.listen(PORT, () => {
+      startup(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+      startup(`API: http://localhost:${PORT}`);
+      startup(`Health check: http://localhost:${PORT}/health`);
+      startup('CORS enabled');
+
+      // Check payment gateway configuration
+      if (!process.env.PAYSTACK_SECRET_KEY && !process.env.FLUTTERWAVE_SECRET_KEY) {
+        logger.warn('Payment gateways not configured - using mock payments for development');
+      }
+    });
+  })
+  .catch((err) => {
+    logger.error('Server initialization failed: ' + (err?.message || err));
+    process.exit(1);
+  });
 
 // Handle graceful shutdown
 process.on('SIGTERM', () => {
