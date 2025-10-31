@@ -49,6 +49,16 @@ const bookSchema = new mongoose.Schema({
     type: String,
     default: 'default-book-cover.jpg'
   },
+  // Levels this book is intended for (e.g., ND1, ND2, HND1, HND2)
+  targetLevels: {
+    type: [
+      {
+        type: String,
+        enum: ['ND1', 'ND2', 'HND1', 'HND2']
+      }
+    ],
+    default: []
+  },
   isActive: {
     type: Boolean,
     default: true

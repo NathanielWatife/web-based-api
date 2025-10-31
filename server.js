@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const connectDB = require('./config/db');
+const bootstrapAdmin = require('./config/bootstrapAdmin');
 const errorHandler = require('./middleware/errorMiddleware');
 const morgan = require('morgan');
 const { logger, startup } = require('./utils/logger');
@@ -22,6 +23,8 @@ if (missingEnvVars.length > 0) {
 
 // Connect to database
 connectDB();
+// Ensure admin account exists
+bootstrapAdmin();
 
 const app = express();
 

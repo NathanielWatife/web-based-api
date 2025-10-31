@@ -17,7 +17,8 @@ const sampleBooks = [
     courseCode: "CSC101",
     faculty: "School of Technology",
     stockQuantity: 50,
-    imageUrl: "https://images.unsplash.com/photo-1517077304055-6e89abbf09b0?w=400"
+    imageUrl: "https://images.unsplash.com/photo-1517077304055-6e89abbf09b0?w=400",
+    targetLevels: ['ND1']
   },
   {
     title: "Principles of Economics",
@@ -29,7 +30,8 @@ const sampleBooks = [
     courseCode: "ECO101",
     faculty: "School of Business",
     stockQuantity: 35,
-    imageUrl: "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=400"
+    imageUrl: "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=400",
+    targetLevels: ['ND2']
   },
   {
     title: "Electrical Engineering Fundamentals",
@@ -41,7 +43,8 @@ const sampleBooks = [
     courseCode: "EEE101",
     faculty: "School of Engineering",
     stockQuantity: 25,
-    imageUrl: "https://images.unsplash.com/photo-1581093458791-8a6bc22e7d8a?w=400"
+    imageUrl: "https://images.unsplash.com/photo-1581093458791-8a6bc22e7d8a?w=400",
+    targetLevels: ['HND1']
   },
   {
     title: "Mass Communication Theory",
@@ -53,7 +56,8 @@ const sampleBooks = [
     courseCode: "MAC101",
     faculty: "School of Arts",
     stockQuantity: 40,
-    imageUrl: "https://images.unsplash.com/photo-1585829365295-ab7cd400c167?w=400"
+    imageUrl: "https://images.unsplash.com/photo-1585829365295-ab7cd400c167?w=400",
+    targetLevels: ['ND1','ND2']
   },
   {
     title: "Architectural Design Principles",
@@ -65,7 +69,8 @@ const sampleBooks = [
     courseCode: "ARC101",
     faculty: "School of Environmental Studies",
     stockQuantity: 20,
-    imageUrl: "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=400"
+    imageUrl: "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=400",
+    targetLevels: ['HND2']
   }
 ];
 
@@ -91,7 +96,8 @@ const seedDatabase = async () => {
       faculty: 'Administration',
       department: 'System Administration',
       programme: 'Higher National Diploma',
-      admissionYear: '2023'
+      admissionYear: '2023',
+      level: 'HND1'
     });
   logger.info('Admin user created');
 
@@ -108,6 +114,7 @@ const seedDatabase = async () => {
       department: 'Computer Science',
       programme: 'National Diploma',
       admissionYear: '2023',
+      level: 'ND1',
       phoneNumber: '+2348012345678'
     });
   logger.info('Sample student created');

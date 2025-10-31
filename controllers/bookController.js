@@ -58,7 +58,21 @@ const saveBufferLocally = async (buffer, folder = 'books', originalName = 'image
 // @access  Public
 const getBooks = async (req, res) => {
   try {
-    const features = new APIFeatures(Book.find({ isActive: true }), req.query)
+    // Support filtering by student level via `level` query param
+    // When provided, include books available to all (no targetLevels) or matching the level
+    const level = req.query.level;
+    const baseFilter = { isActive: true };
+    if (level) {
+      baseFilter.$or = [
+        { targetLevels: { $size: 0 } },
+        { targetLevels: level }
+      ];
+    }
+
+    // Remove custom params so they don't pollute APIFeatures.filter()
+    const { level: _omitLevel, ...queryRest } = req.query || {};
+
+    const features = new APIFeatures(Book.find(baseFilter), queryRest)
       .filter()
       .search()
       .sort()
@@ -68,11 +82,11 @@ const getBooks = async (req, res) => {
     const books = await features.query;
 
     // Get total count for pagination
-    const totalFeatures = new APIFeatures(Book.find({ isActive: true }), req.query)
+    const totalFeatures = new APIFeatures(Book.find(baseFilter), queryRest)
       .filter()
       .search();
     
-    const total = await Book.countDocuments(totalFeatures.query);
+  const total = await Book.countDocuments(totalFeatures.query);
 
     res.json({
       success: true,
@@ -141,12 +155,72 @@ const getCategories = async (req, res) => {
   }
 };
 
+// @desc    Get recommended books for the logged-in user based on level
+// @route   GET /api/books/recommended
+// @access  Private
+const getRecommendedBooks = async (req, res) => {
+  try {
+    const userLevel = req.user?.level;
+
+    // If level is not set, return empty list with guidance
+    if (!userLevel) {
+      return res.json({
+        success: true,
+        count: 0,
+        data: [],
+        message: 'No level set on user profile; update profile to receive recommendations.'
+      });
+    }
+
+    const limit = parseInt(req.query.limit) || 12;
+
+    const books = await Book.find({
+      isActive: true,
+      $or: [
+        { targetLevels: { $size: 0 } }, // books available to all
+        { targetLevels: userLevel }
+      ]
+    })
+      .sort({ 'ratings.average': -1, createdAt: -1 })
+      .limit(limit);
+
+    res.json({
+      success: true,
+      count: books.length,
+      data: books
+    });
+  } catch (error) {
+    logger.error('Get recommended books error: ' + (error?.message || error));
+    res.status(500).json({ success: false, message: error.message || 'Failed to fetch recommendations' });
+  }
+};
+
 // @desc    Create book
 // @route   POST /api/books
 // @access  Private/Admin
+const normalizeLevels = (body) => {
+  // Accept targetLevels as array, comma-separated string, JSON string, or repeated 'targetLevels[]'
+  let levels = body.targetLevels ?? body['targetLevels[]'];
+  if (Array.isArray(levels)) return levels;
+  if (typeof levels === 'string') {
+    try {
+      const parsed = JSON.parse(levels);
+      if (Array.isArray(parsed)) return parsed;
+    } catch (_) {
+      // not JSON, try comma-separated
+      const parts = levels.split(',').map(s => s.trim()).filter(Boolean);
+      if (parts.length) return parts;
+      return [levels];
+    }
+  }
+  return undefined;
+};
+
 const createBook = async (req, res) => {
   try {
     let payload = { ...req.body };
+    const levels = normalizeLevels(req.body);
+    if (levels) payload.targetLevels = levels;
 
     // If image file is present, upload to Cloudinary (or fallback to local storage)
     if (req.file && req.file.buffer) {
@@ -181,6 +255,8 @@ const createBook = async (req, res) => {
 const updateBook = async (req, res) => {
   try {
     let updates = { ...req.body };
+    const levels = normalizeLevels(req.body);
+    if (levels) updates.targetLevels = levels;
 
     // If a new image file is present, upload and set imageUrl (Cloudinary or local fallback)
     if (req.file && req.file.buffer) {
@@ -255,6 +331,7 @@ module.exports = {
   getBooks,
   getBook,
   getCategories,
+  getRecommendedBooks,
   createBook,
   updateBook,
   deleteBook

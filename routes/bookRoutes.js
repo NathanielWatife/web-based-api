@@ -3,6 +3,7 @@ const {
   getBooks,
   getBook,
   getCategories,
+  getRecommendedBooks,
   createBook,
   updateBook,
   deleteBook
@@ -14,6 +15,7 @@ const router = express.Router();
 
 router.get('/', getBooks);
 router.get('/categories', getCategories);
+router.get('/recommended', protect, getRecommendedBooks);
 router.get('/:id', getBook);
 
 // Admin routes

@@ -50,6 +50,12 @@ const userSchema = new mongoose.Schema({
     enum: ['National Diploma', 'Higher National Diploma'],
     default: 'National Diploma'
   },
+  // Explicit student level used for recommendations
+  level: {
+    type: String,
+    enum: ['ND1', 'ND2', 'HND1', 'HND2'],
+    required: false
+  },
   admissionYear: {
     type: String,
     required: true

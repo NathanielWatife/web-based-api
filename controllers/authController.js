@@ -22,6 +22,7 @@ const registerStudent = async (req, res) => {
       faculty, 
       department, 
       programme, 
+      level,
       admissionYear 
     } = req.body;
 
@@ -48,6 +49,7 @@ const registerStudent = async (req, res) => {
       faculty,
       department,
       programme,
+      level,
       admissionYear,
       isVerified: false
     });
@@ -129,6 +131,7 @@ const login = async (req, res) => {
           email: user.email,
           matricNo: user.matricNo,
           role: user.role,
+          level: user.level,
           faculty: user.faculty,
           department: user.department,
           isVerified: user.isVerified
@@ -309,6 +312,7 @@ const verifyToken = async (req, res) => {
           email: user.email,
           matricNo: user.matricNo,
           role: user.role,
+          level: user.level,
           faculty: user.faculty,
           department: user.department,
           isVerified: user.isVerified
@@ -371,6 +375,7 @@ const verifyEmail = async (req, res) => {
           email: user.email,
           matricNo: user.matricNo,
           role: user.role,
+          level: user.level,
           faculty: user.faculty,
           department: user.department,
           isVerified: user.isVerified
