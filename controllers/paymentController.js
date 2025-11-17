@@ -42,7 +42,7 @@ const initializePayment = async (req, res) => {
     if (order.user._id.toString() !== req.user.id) {
       return res.status(403).json({
         success: false,
-      flutterwaveWebhook
+        message: 'Access denied to this order'
       });
     }
 
@@ -272,6 +272,10 @@ module.exports = {
   verifyPayment,
   paystackWebhook,
   flutterwaveWebhook,
+  adminListPaymentEvents,
+  adminListTransactions,
+  adminRefundPayment,
+  adminExportTransactionsCSV,
   listPaymentMethods,
   deletePaymentMethod
 };
@@ -478,6 +482,67 @@ async function adminRefundPayment(req, res) {
   } catch (e) {
     logger.error('Admin refund error: ' + (e?.message || e));
     res.status(500).json({ success: false, message: 'Failed to process refund' });
+  }
+}
+
+// @desc    Export transactions as CSV
+// @route   GET /api/payments/admin/export/transactions.csv
+// @access  Admin
+async function adminExportTransactionsCSV(req, res) {
+  try {
+    const { status, paymentStatus, from, to } = req.query;
+    const q = {};
+    if (status) q.status = status;
+    if (paymentStatus) q.paymentStatus = paymentStatus;
+    if (from || to) {
+      q.createdAt = {};
+      if (from) q.createdAt.$gte = new Date(from);
+      if (to) q.createdAt.$lte = new Date(to);
+    }
+    const orders = await Order.find(q)
+      .sort({ createdAt: -1 })
+      .populate('user', 'firstName lastName email matricNo phoneNumber faculty department programme level')
+      .lean();
+
+    const esc = (v) => {
+      if (v === null || v === undefined) return '';
+      const s = String(v);
+      if (/[",\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+      return s;
+    };
+
+    const headers = [
+      'orderId','createdAt','status','paymentStatus','paymentMethod','paymentReference','totalAmount',
+      'studentFirstName','studentLastName','email','matricNo','phoneNumber','faculty','department','programme','level'
+    ];
+    const rows = orders.map(o => [
+      o.orderId,
+      o.createdAt?.toISOString?.() || o.createdAt,
+      o.status,
+      o.paymentStatus,
+      o.paymentMethod,
+      o.paymentReference,
+      o.totalAmount,
+      o.user?.firstName,
+      o.user?.lastName,
+      o.user?.email,
+      o.user?.matricNo,
+      o.user?.phoneNumber,
+      o.user?.faculty,
+      o.user?.department,
+      o.user?.programme,
+      o.user?.level,
+    ]);
+
+    const csv = [headers.map(esc).join(','), ...rows.map(r => r.map(esc).join(','))].join('\n');
+
+    const filename = `transactions_${new Date().toISOString().slice(0,10)}.csv`;
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    return res.status(200).send(csv);
+  } catch (e) {
+    logger.error('Admin export transactions CSV error: ' + (e?.message || e));
+    res.status(500).json({ success: false, message: 'Failed to export transactions' });
   }
 }
 
