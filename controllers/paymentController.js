@@ -267,18 +267,8 @@ const verifyPayment = async (req, res) => {
   }
 };
 
-module.exports = {
-  initializePayment,
-  verifyPayment,
-  paystackWebhook,
-  flutterwaveWebhook,
-  adminListPaymentEvents,
-  adminListTransactions,
-  adminRefundPayment,
-  adminExportTransactionsCSV,
-  listPaymentMethods,
-  deletePaymentMethod
-};
+// Exports are placed at the end of the file to ensure
+// all handlers are defined before being referenced.
 
 // --- Webhooks ---
 
@@ -625,3 +615,16 @@ async function deletePaymentMethod(req, res) {
     res.status(500).json({ success: false, message: 'Failed to delete payment method' });
   }
 }
+
+module.exports = {
+  initializePayment,
+  verifyPayment,
+  paystackWebhook,
+  flutterwaveWebhook,
+  adminListPaymentEvents,
+  adminListTransactions,
+  adminRefundPayment,
+  adminExportTransactionsCSV,
+  listPaymentMethods,
+  deletePaymentMethod
+};
