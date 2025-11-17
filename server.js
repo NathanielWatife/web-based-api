@@ -6,7 +6,6 @@ const helmet = require('helmet');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const sanitize = require('./middleware/sanitizeMiddleware');
-const xssClean = require('xss-clean');
 const hpp = require('hpp');
 const connectDB = require('./config/db');
 const bootstrapAdmin = require('./config/bootstrapAdmin');
@@ -88,7 +87,6 @@ app.use(compression());
 app.use(express.json({ limit: '100kb' }));
 app.use(express.urlencoded({ extended: true, limit: '100kb' }));
 app.use(sanitize());
-app.use(xssClean());
 app.use(hpp());
 
 // Simple request ID for correlating logs
