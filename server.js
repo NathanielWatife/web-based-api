@@ -2,6 +2,12 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const helmet = require('helmet');
+const compression = require('compression');
+const rateLimit = require('express-rate-limit');
+const mongoSanitize = require('express-mongo-sanitize');
+const xssClean = require('xss-clean');
+const hpp = require('hpp');
 const connectDB = require('./config/db');
 const bootstrapAdmin = require('./config/bootstrapAdmin');
 const errorHandler = require('./middleware/errorMiddleware');
@@ -29,6 +35,8 @@ const initialize = async () => {
 };
 
 const app = express();
+// Trust proxy when behind load balancers (rate limits & IPs)
+app.set('trust proxy', 1);
 
 // Enhanced CORS configuration
 const corsOptions = {
@@ -71,9 +79,43 @@ app.use(cors(corsOptions));
 // Handle preflight requests explicitly (use RegExp to avoid path-to-regexp '*' issue)
 app.options(/.*/, cors(corsOptions));
 
+// Webhooks must be mounted BEFORE JSON parsing for raw signature verification
+app.use('/api/payments/webhook', require('./routes/paymentWebhooks'));
+
 // Middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(helmet());
+app.use(compression());
+app.use(express.json({ limit: '100kb' }));
+app.use(express.urlencoded({ extended: true, limit: '100kb' }));
+app.use(mongoSanitize());
+app.use(xssClean());
+app.use(hpp());
+
+// Simple request ID for correlating logs
+app.use((req, res, next) => {
+  try {
+    const { randomUUID } = require('crypto');
+    req.requestId = randomUUID();
+    res.setHeader('X-Request-Id', req.requestId);
+  } catch (_) {}
+  next();
+});
+
+// Rate limiting
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 1000,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api', apiLimiter);
+app.use('/api/payments/admin', require('./routes/paymentAdminRoutes'));
 
 // HTTP logging (sanitized): avoid logging query strings or sensitive headers
 morgan.token('urlPath', (req) => (req.originalUrl || req.url || '').split('?')[0]);
@@ -85,7 +127,7 @@ app.use(
 );
 
 // Routes
-app.use('/api/auth', require('./routes/authRoutes'));
+app.use('/api/auth', authLimiter, require('./routes/authRoutes'));
 app.use('/api/books', require('./routes/bookRoutes'));
 app.use('/api/orders', require('./routes/orderRoutes'));
 app.use('/api/payments', require('./routes/paymentRoutes'));
@@ -129,7 +171,7 @@ app.use((req, res) => {
   });
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT;
 
 let server;
 initialize()
@@ -142,7 +184,7 @@ initialize()
 
       // Check payment gateway configuration
       if (!process.env.PAYSTACK_SECRET_KEY && !process.env.FLUTTERWAVE_SECRET_KEY) {
-        logger.warn('Payment gateways not configured - using mock payments for development');
+        logger.warn('Payment gateways not configured. Payments will be unavailable.');
       }
     });
   })
